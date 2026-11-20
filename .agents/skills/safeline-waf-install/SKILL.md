@@ -67,10 +67,14 @@ bash scripts/install_safeline.sh
 bash -c "$(curl -fsSLk https://waf-ce.chaitin.cn/release/latest/manager.sh)"
 ```
 
+> ⚠️ **关键**：官方 `manager.py` 要求 **STDIN 是标准 TTY**，否则报 `运行脚本的方式不对, STDIN 不是标准的 TTY` 并直接退出。
+> 本 skill 自带 `scripts/pty_runner.py`，用伪终端执行并自动应答菜单（选择动作=`1`、安装目录=回车用默认 `/data/safeline`）。
+> 手工执行时可用 `script -qec '...' /dev/null`。
+
 要点：
-- 需要 root；脚本会自动检查并按需安装 `python3`（雷池管理脚本依赖）。
-- 会自动拉取镜像并启动容器，耗时几分钟属正常。
-- 安装目录默认为 `/opt/safeline`。
+- 需要 root；脚本会自动检查并按需安装 `python3`（CentOS 7 默认只有 python2.7，必须手动装）。
+- 会自动拉取镜像并启动容器（镜像托管在华为云 SWR，速度较快），耗时几分钟属正常。
+- **安装目录默认 `/data/safeline`**（官方默认，不是 `/opt/safeline`）。
 - 离线环境请改用官方「离线安装」方案，见 `references/离线安装.md`。
 
 ## 4. 初始化管理员账号
@@ -124,3 +128,13 @@ bash scripts/verify.sh
 - **不要**把管理员密码、API Token 写入仓库任何文件或日志。
 - 安装会占用 9443 端口与较大磁盘/内存，**生产环境执行前先与用户确认**。
 - 不要在已有业务端口上强行部署。
+
+## 已知环境坑（实测）
+
+| 环境 | 问题 | 处理 |
+|---|---|---|
+| CentOS 7 | 默认只有 python2.7 | `yum install -y python3` |
+| CentOS 7 | 轩辕 Docker 脚本走归档源，compose 下载可能失败 | 手动装 compose（见故障排查） |
+| 老 CPU（QEMU 2.5+） | compose v2.29.x 段错误 | 降到 v2.24.6 |
+| 任意 | 镜像源探测通过但拉不动镜像 | 用 `test_mirrors.sh --full` 筛选 |
+| 任意 | 官方脚本要求 TTY | 用 `pty_runner.py` / `script -qec` |

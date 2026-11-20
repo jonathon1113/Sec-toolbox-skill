@@ -185,22 +185,29 @@ else
 fi
 
 # 保留 daemon.json 里的其它字段（如 data-root、log-driver）
-EXISTING_OTHER=""
-if [ -f "$DAEMON_JSON" ]; then
-  EXISTING_OTHER=$(grep -v 'registry-mirrors' "$DAEMON_JSON" | grep -v '"[[:space:]]*"' || true)
-fi
-
+# 优先用 python3 做可靠的 JSON 合并；无 python3 时退化为整文件覆盖。
 TMP_NEW=$(mktemp)
-if [ -n "$EXISTING_OTHER" ] && printf '%s' "$EXISTING_OTHER" | grep -q '{'; then
-  # 简单合并：删除旧 registry-mirrors 块后插入新的
-  {
-    printf '{\n'
-    printf '  "registry-mirrors": [\n%s\n  ]' "$JSON_MIRRORS"
-    printf ',\n'
-    # 去掉多余逗号后拼接其余字段
-    printf '%s' "$EXISTING_OTHER" | sed -e 's/^[[:space:]]*//' -e '/^$/d' | grep -v '^\s*"registry-mirrors"'
-    printf '\n}\n'
-  } > "$TMP_NEW"
+if have python3; then
+  python3 - "$DAEMON_JSON" "$TMP_NEW" "$SELECTED" <<'PYEOF' || exit 2
+import json, os, sys
+
+src, dst = sys.argv[1], sys.argv[2]
+mirrors = [m.strip() for m in sys.argv[3].splitlines() if m.strip()]
+mirrors = [m if m.startswith("http") else "https://" + m for m in mirrors]
+
+data = {}
+if os.path.exists(src):
+    try:
+        with open(src, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
+
+data["registry-mirrors"] = mirrors
+with open(dst, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+PYEOF
 else
   cat > "$TMP_NEW" <<EOF
 {

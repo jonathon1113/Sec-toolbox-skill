@@ -46,7 +46,14 @@ case "$CODE" in
 esac
 
 echo "--- 4) 安装目录 ---"
-[ -d /opt/safeline ] && echo "  /opt/safeline 存在" || echo "  (未发现 /opt/safeline，可能安装在其它路径)"
+if [ -d /data/safeline ]; then
+  echo "  /data/safeline 存在（官方默认安装目录）"
+  ls /data/safeline 2>/dev/null | head -5 | sed 's/^/    /'
+elif [ -d /opt/safeline ]; then
+  echo "  /opt/safeline 存在"
+else
+  echo "  (未发现 /data/safeline 或 /opt/safeline)"
+fi
 
 echo "=========================================="
 if [ "$FAIL" = "0" ]; then
