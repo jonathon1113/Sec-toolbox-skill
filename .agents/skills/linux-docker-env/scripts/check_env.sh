@@ -4,6 +4,7 @@
 # 退出码: 0=就绪 10=Docker缺失 11=版本过低 12=缺Compose
 set -uo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MIN_DOCKER="20.10.14"
 MIN_COMPOSE="2.0.0"
 CHECK_REGISTRY=0
@@ -92,7 +93,9 @@ if [ "$CHECK_REGISTRY" = "1" ]; then
   fi
   if [ "$DOCKER_OK" = 1 ]; then
     echo "--- 拉取测试 (hello-world) ---"
-    timeout 60 docker pull hello-world >/dev/null 2>&1 && echo "拉取测试: 成功" || echo "拉取测试: 失败（可能需要配置镜像加速）"
+    timeout 90 docker pull hello-world >/dev/null 2>&1 && echo "拉取测试: 成功" || echo "拉取测试: 失败（可能需要配置镜像加速）"
+    echo "--- 镜像源健康检查 ---"
+    bash "$SCRIPT_DIR/test_mirrors.sh" 2>/dev/null || echo "(镜像源测速不可用)"
   fi
 fi
 

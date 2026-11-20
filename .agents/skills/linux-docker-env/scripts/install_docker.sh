@@ -28,7 +28,7 @@ if [ "$(id -u)" -ne 0 ]; then
   echo "[!] 当前不是 root，请确认 sudo 可用（后续命令会自动加 sudo）"
 fi
 
-echo "========== 1/3 预检查 =========="
+echo "========== 1/4 预检查 =========="
 bash "$SCRIPT_DIR/check_env.sh" >/tmp/check_env_pre.txt 2>&1
 PRE_EXIT=$?
 tail -25 /tmp/check_env_pre.txt
@@ -40,7 +40,7 @@ if [ "$PRE_EXIT" -eq 0 ] && [ "$FORCE" -eq 0 ]; then
 fi
 
 echo
-echo "========== 2/3 执行轩辕镜像一键安装脚本 =========="
+echo "========== 2/4 执行轩辕镜像一键安装脚本 =========="
 SUCCESS=0
 for url in "${MIRRORS[@]}"; do
   echo "--> 尝试镜像源: $url"
@@ -67,17 +67,29 @@ if [ "$SUCCESS" -ne 1 ]; then
 fi
 
 echo
-echo "========== 3/3 安装后校验 =========="
+echo "========== 3/4 安装后校验 =========="
 sleep 3
 bash "$SCRIPT_DIR/check_env.sh" --registry
 RC=$?
 
-if [ "$RC" -eq 0 ]; then
+if [ "$RC" -ne 0 ]; then
   echo
-  echo "[OK] Docker 环境安装并校验通过。"
-  exit 0
+  echo "[X] 安装脚本执行完毕，但校验未通过（退出码 $RC）。请检查上面的输出。"
+  exit $RC
 fi
 
 echo
-echo "[X] 安装脚本执行完毕，但校验未通过（退出码 $RC）。请检查上面的输出。"
-exit $RC
+echo "========== 4/4 优选镜像加速源 =========="
+# 轩辕脚本会写入它自己的镜像源，但不保证是最快的。
+# 这里统一重新测速，自动写入实测最快的源（失效可随时重跑本脚本自动切换）。
+bash "$SCRIPT_DIR/configure_mirrors.sh" --top 1
+MIRROR_RC=$?
+if [ "$MIRROR_RC" -ne 0 ]; then
+  echo
+  echo "[!] 镜像加速源自动优选未完成（退出码 $MIRROR_RC）。Docker 本身已可用，"
+  echo "    拉取镜像慢时可手动重跑： bash $SCRIPT_DIR/configure_mirrors.sh --force"
+fi
+
+echo
+echo "[OK] Docker 环境安装并校验通过。"
+exit 0
