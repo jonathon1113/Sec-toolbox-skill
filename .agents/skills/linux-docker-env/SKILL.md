@@ -42,14 +42,16 @@ bash scripts/check_env.sh
 bash scripts/install_docker.sh
 ```
 
-脚本内部逻辑（幂等，已安装则跳过）：
+六个阶段（幂等，已安装则跳过）：
 
-1. 预检查；
-2. 用官方一键脚本安装，自动配置镜像加速源：
-   - 主源：`https://get.xuanyuan.cloud/docker.sh`
-   - 备用源：`https://get.xuanyuan.me/docker.sh`
-3. 安装后重新执行 `check_env.sh` 验证；
-4. **再跑一次镜像源测速**，把实测最快的源写入 `/etc/docker/daemon.json` 并重启 Docker。
+| 阶段 | 动作 |
+|---|---|
+| 1/6 | 预检查 |
+| 2/6 | 确保 `python3` 可用（CentOS 7 默认只有 python2.7，很多工具强依赖） |
+| 3/6 | 轩辕镜像一键安装脚本（**自动应答交互菜单**） |
+| 4/6 | 确保 Docker Compose v2 可用（`install_compose.sh`） |
+| 5/6 | 校验（版本、服务、拉取） |
+| 6/6 | 实测优选镜像加速源 |
 
 如果目标主机不能访问外网（离线环境），不要执行一键脚本，改走 `references/离线安装.md`。
 
@@ -105,11 +107,25 @@ bash scripts/configure_mirrors.sh --check
 - Docker Compose ≥ 2.0.0（`docker compose` 子命令形式）
 - 1 核 CPU / 2 GB 内存 / 5 GB 磁盘（仅为 Docker 本身）
 
+## 脚本一览
+
+| 脚本 | 作用 |
+|---|---|
+| `check_env.sh` | 只读体检（系统/CPU/内存/磁盘/Docker/Compose/镜像源） |
+| `install_docker.sh` | 一键装齐 Docker + python3 + Compose，并优选镜像源 |
+| `install_compose.sh` | 单独安装 Compose v2（包管理器 → 国内 RPM → 静态二进制，含段错误降级） |
+| `test_mirrors.sh` | 镜像源测速排序（快速 / 真实拉取两种模式） |
+| `configure_mirrors.sh` | 把最优源写入 `daemon.json`（备份+校验+重启+验证） |
+| `switch_mirror.sh` | 换源快捷入口（失效才切 / `--force` 无条件切） |
+| `pty_runner.py` | 伪终端应答器（轩辕脚本是交互式的，直接跑会死循环） |
+
 ## 注意事项
 
 - 一键安装脚本会写入 `/etc/docker/daemon.json` 并重启 docker 服务，**会中断该主机上正在运行的容器**。生产环境请先确认影响。
 - 修改 `registry-mirrors` 同样需要重启 Docker，同样会中断容器。
-- 脚本支持 Ubuntu/Debian/CentOS/RHEL/Rocky/Alma/Fedora/openEuler/Anolis/UOS/麒麟/Deepin/openSUSE 等 19 种发行版；**不支持 CentOS 7**。
+- 轩辕脚本是**交互式**的，主菜单需要选 `1`。本 skill 用 `pty_runner.py` 分配伪终端自动应答；若机器没有 python3，则退化为 `yes 1 |` 管道喂入。
+- 脚本支持 Ubuntu/Debian/CentOS/RHEL/Rocky/Alma/Fedora/openEuler/Anolis/UOS/麒麟/Deepin/openSUSE 等 19 种发行版；**CentOS 7 走归档源**，安装较慢。
+- **Compose 版本坑**：v2.29+ 在部分老 CPU（如 QEMU 2.5+ 虚拟 CPU）上会 Segmentation fault，`install_compose.sh` 会实测验证并自动降级到 v2.24.6。
 - 全部操作需要 root 或可用的 sudo；脚本内已做 sudo 探测。
 
 ## 参考资料
