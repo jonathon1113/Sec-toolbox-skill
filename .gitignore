@@ -13,3 +13,7 @@ Thumbs.db
 *.pem
 *.key
 notes-*.txt
+
+# Python 缓存
+__pycache__/
+*.pyc
