@@ -42,14 +42,16 @@ case "$APP" in
     if [ -n "$ARTEX_C" ]; then
       echo "==> 取一次性 setup token（compose 模式，仅本次输出，请立刻保存）："
       echo "    用于首次访问 /setup 完成认领；认领后失效。"
+      echo "    注意：容器每次启动/重建都会生成新 token，这里取的是**最新一条**。"
       echo
-      docker logs "$ARTEX_C" 2>&1 | grep -i "setup token" | tail -3
+      # 日志里每次启动都有一条 token，必须取最后一条（tail -1），取旧的会报 Invalid setup token
+      docker logs "$ARTEX_C" 2>&1 | grep -oE "Setup token for the /setup page: [0-9a-f]+" | tail -1 | awk '{print $NF}'
     else
       APP_DIR="${ARTEX_DIR:-/opt/artex}"
       FOUND=0
       for d in "$APP_DIR" "$APP_DIR"/*/; do
         [ -f "$d/artex.log" ] || continue
-        TOK="$(grep -aioE "setup token for the /setup page: [0-9a-f]+" "$d/artex.log" 2>/dev/null | tail -1 | grep -oE "[0-9a-f]{16,}")"
+        TOK="$(grep -aioE "setup token for the /setup page: [0-9a-f]+" "$d/artex.log" 2>/dev/null | tail -1 | grep -oE "[0-9a-f]{16,}$")"
         if [ -n "$TOK" ]; then
           echo "==> 取一次性 setup token（binary 模式，仅本次输出，请立刻保存）："
           echo "    用于首次访问 /setup 完成认领；认领后失效。"
