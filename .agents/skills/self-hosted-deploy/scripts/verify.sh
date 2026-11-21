@@ -45,7 +45,8 @@ if have docker && docker info >/dev/null 2>&1; then
       ;;
     artex)
       # compose 模式：容器名含 artex；binary 模式：宿主机进程
-      if docker ps --format '{{.Names}}' 2>/dev/null | grep -qE '(^|-)artex$'; then
+      ARTEX_C="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -i artex | grep -v postgres | head -1)"
+      if [ -n "$ARTEX_C" ]; then
         docker ps -a --format '{{.Names}}\t{{.Status}}' 2>/dev/null | grep -E 'artex|postgres' | sed 's/^/  /'
         if docker ps --format '{{.Names}}' 2>/dev/null | grep -q postgres; then
           echo "  postgres: 运行中"
@@ -109,21 +110,36 @@ case "$APP" in
     fi
     ;;
   artex)
-    FOUND_DIR=""
-    for d in /opt/artex /opt/artex/*/; do
-      if [ -f "$d/config.json" ] || [ -f "$d/start.sh" ]; then FOUND_DIR="${d%/}"; break; fi
-    done
-    if [ -n "$FOUND_DIR" ]; then
-      echo "  安装目录: $FOUND_DIR"
-      [ -f "$FOUND_DIR/config.json" ] && echo "    config.json 存在" || echo "    <== config.json 缺失（需填 database 段）"
-      [ -f "$FOUND_DIR/artex" ] && echo "    artex 二进制存在"
-      [ -d "$FOUND_DIR/skills" ] && echo "    skills/ 存在（持久化）"
-      [ -d "$FOUND_DIR/data" ] && echo "    data/ 存在（持久化）"
-      if [ -f "$FOUND_DIR/artex.log" ] && grep -qa "setup token" "$FOUND_DIR/artex.log"; then
-        echo "  setup token: 已在 artex.log 中（用 scripts/init_admin.sh --app artex 取出）"
+    # compose 模式看 .env / compose 文件；binary 模式看 config.json / start.sh
+    ARTEX_DIR="${ARTEX_DIR:-/opt/artex}"
+    if [ -f "$ARTEX_DIR/docker-compose.yml" ] || [ -f "$ARTEX_DIR/compose.yml" ]; then
+      echo "  安装目录: $ARTEX_DIR（compose 模式）"
+      [ -f "$ARTEX_DIR/.env" ] && echo "    .env 存在" || echo "    <== .env 缺失（POSTGRES_PASSWORD 等在此）"
+      if grep -qiE '^POSTGRES_PASSWORD=(change-me-please|changeme|password|)$' "$ARTEX_DIR/.env" 2>/dev/null; then
+        echo "    <== POSTGRES_PASSWORD 仍是默认占位值，必须改掉"
+        FAIL=1
+      else
+        echo "    POSTGRES_PASSWORD 已设置（非占位值）"
       fi
+      [ -d "$ARTEX_DIR/skills" ] && echo "    skills/ 存在（持久化）"
+      [ -d "$ARTEX_DIR/data" ] && echo "    data/ 存在（持久化）"
     else
-      echo "  未找到 /opt/artex 安装目录（compose 模式可用 --dir 指定其它位置）"
+      FOUND_DIR=""
+      for d in "$ARTEX_DIR" "$ARTEX_DIR"/*/; do
+        if [ -f "$d/config.json" ] || [ -f "$d/start.sh" ]; then FOUND_DIR="${d%/}"; break; fi
+      done
+      if [ -n "$FOUND_DIR" ]; then
+        echo "  安装目录: $FOUND_DIR（binary 模式）"
+        [ -f "$FOUND_DIR/config.json" ] && echo "    config.json 存在" || echo "    <== config.json 缺失（需填 database 段）"
+        [ -f "$FOUND_DIR/artex" ] && echo "    artex 二进制存在"
+        [ -d "$FOUND_DIR/skills" ] && echo "    skills/ 存在（持久化）"
+        [ -d "$FOUND_DIR/data" ] && echo "    data/ 存在（持久化）"
+        if [ -f "$FOUND_DIR/artex.log" ] && grep -qa "setup token" "$FOUND_DIR/artex.log"; then
+          echo "  setup token: 已在 artex.log 中（用 scripts/init_admin.sh --app artex 取出）"
+        fi
+      else
+        echo "  未找到 $ARTEX_DIR 安装目录（compose 模式可用 --dir 指定其它位置）"
+      fi
     fi
     ;;
 esac

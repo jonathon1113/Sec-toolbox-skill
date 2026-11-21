@@ -32,6 +32,39 @@ AI 驱动的自主渗透测试平台：双图架构（探索图 + 资产图）�
 | B. release 预编译二进制（README Option 3） | 降级 | ≥ 2 GB | 5 分钟 | 宿主机进程 + postgres 容器 |
 | C. 源码构建单二进制（Option 4） | 最后兜底 | ≥ 4 GB | 20+ 分钟 | 宿主机进程 |
 
+### 构建耗时预期（实测：全新构建 ≈ 30~45 分钟）
+
+ARTEX **没有预构建镜像**，compose 路径必然本地构建。各阶段实测耗时：
+
+| 阶段 | 耗时 | 说明 |
+|---|---|---|
+| 拉基础镜像（node:22 / golang:1.26 / debian） | 3~8 分钟 | 走加速源/代理 |
+| `npm ci` + `npm run build:static` | 2~3 分钟 | 前端静态构建，最吃内存 |
+| `go mod download` + `go build` | 3~5 分钟 | **需要 proxy.golang.org，走代理** |
+| **Ansible 装 20+ 扫描器工具链** | **10~15 分钟** | nmap/nuclei/httpx/katana/sqlmap/playwright… **最慢的一段** |
+| 导出镜像层 | 2~5 分钟 | 镜像数 GB |
+
+> 对比：官方预编译二进制只有 **17MB**（工具链已打包进去），下载即用，5 分钟搞定。
+> **Docker 优先的价值在于形态与运维，不在于速度。**
+
+### 部署多台机器：复用构建产物，别每次重编
+
+首次构建后把镜像导出，后续机器直接导入（几分钟 vs 半小时）：
+
+```bash
+# 构建机
+docker save artex:local -o artex-image.tar        # 或 docker save <compose 生成的镜像名>
+gzip artex-image.tar                              # 体积小很多
+
+# 目标机
+gunzip -c artex-image.tar | docker load
+cd /opt/artex && docker compose up -d             # 已有镜像则不再 build
+```
+
+或者推到私有 registry，之后 `docker compose pull` + `up -d`。
+
+> 目标机要跳过构建：把 compose 里的 `build:` 段注释掉，或用 `docker compose up -d --no-build`。
+
 ### A 跑不通时，先解决问题，再降级
 
 **不要一看到内存不足就直接用二进制** —— 正确顺序是：

@@ -37,11 +37,13 @@ case "$APP" in
     # 两种运行形态：
     #   compose 模式 → token 在容器日志里
     #   binary  模式 → token 在进程 stderr / artex.log 里
-    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qE '(^|-)artex$'; then
+    # compose 的容器名是 <项目>-<服务>-<序号>（如 artex-artex-1），不能写死服务名
+    ARTEX_C="$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -i artex | grep -v postgres | head -1)"
+    if [ -n "$ARTEX_C" ]; then
       echo "==> 取一次性 setup token（compose 模式，仅本次输出，请立刻保存）："
       echo "    用于首次访问 /setup 完成认领；认领后失效。"
       echo
-      docker logs artex 2>&1 | grep -i "setup token" | tail -3
+      docker logs "$ARTEX_C" 2>&1 | grep -i "setup token" | tail -3
     else
       APP_DIR="${ARTEX_DIR:-/opt/artex}"
       FOUND=0
