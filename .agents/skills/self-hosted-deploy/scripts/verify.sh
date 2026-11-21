@@ -25,6 +25,7 @@ echo "=========================================="
 case "$APP" in
   safeline) echo " 雷池 SafeLine CE 自检" ;;
   artex)    echo " ARTEX 自检" ;;
+  cyberstrike) echo " CyberStrikeAI 自检" ;;
   *) echo "[X] 未知 --app: $APP"; exit 1 ;;
 esac
 echo "=========================================="
@@ -41,6 +42,14 @@ if have docker && docker info >/dev/null 2>&1; then
         echo "  <== 容器未全部就绪（运行 $RUNNING / 共 $TOTAL，期望 7/7）"; FAIL=1
       else
         echo "  运行中: $RUNNING / 共 $TOTAL"
+      fi
+      ;;
+    cyberstrike)
+      if pgrep -f 'cyberstrike-ai' >/dev/null 2>&1; then
+        echo "  cyberstrike-ai: 进程运行中"
+        pgrep -af cyberstrike-ai 2>/dev/null | head -2 | sed 's/^/    /'
+      else
+        echo "  <== 未找到 cyberstrike-ai 进程"; FAIL=1
       fi
       ;;
     artex)
@@ -70,6 +79,7 @@ echo "--- 2) 端口监听 ---"
 case "$APP" in
   safeline) PORT=9443 ;;
   artex)    PORT=8787 ;;
+  cyberstrike) PORT=8080 ;;
 esac
 if have ss; then
   if ss -lnt 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${PORT}\$"; then
@@ -86,6 +96,7 @@ echo "--- 3) HTTP 探测 ---"
 case "$APP" in
   safeline) URL="https://127.0.0.1:${PORT}/" ;;
   artex)    URL="http://127.0.0.1:${PORT}/" ;;
+  cyberstrike) URL="https://127.0.0.1:${PORT}/" ;;
 esac
 if have curl; then
   CODE="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 15 "$URL" 2>/dev/null)"
@@ -107,6 +118,20 @@ case "$APP" in
       ls /data/safeline 2>/dev/null | sed 's/^/    /' | head -6
     else
       echo "  <== /data/safeline 不存在"; FAIL=1
+    fi
+    ;;
+  cyberstrike)
+    DIR="${CYBERSTRIKE_DIR:-/opt/cyberstrike}"
+    if [ -d "$DIR" ]; then
+      echo "  安装目录: $DIR"
+      [ -f "$DIR/config.yaml" ] && echo "    config.yaml 存在" || echo "    <== config.yaml 缺失（首次启动会自动生成）"
+      [ -x "$DIR/cyberstrike-ai" ] && echo "    cyberstrike-ai 二进制存在"
+      [ -d "$DIR/venv" ] && echo "    venv/ 存在（Python 依赖）"
+      if grep -qaiE 'api_key:[[:space:]]*\$\{[A-Z_]+\}' "$DIR/config.yaml" 2>/dev/null; then
+        echo "    <== AI 渠道 api_key 仍是环境变量占位（未填）—— 不配 AI 渠道任务跑不了"
+      fi
+    else
+      echo "  未找到 $DIR 安装目录"
     fi
     ;;
   artex)
@@ -150,6 +175,7 @@ if [ "$FAIL" = "0" ]; then
   case "$APP" in
     safeline) echo "控制台地址: https://<服务器IP>:${PORT}/" ;;
     artex)    echo "Web UI: http://<服务器IP>:${PORT}/  （首次访问 /setup 用 setup token 认领）" ;;
+    cyberstrike) echo "Web UI: https://<服务器IP>:${PORT}/  （自签证书，首次需接受告警；http:// 会 308 跳 https）" ;;
   esac
   exit 0
 else

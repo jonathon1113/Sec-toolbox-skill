@@ -14,7 +14,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$APP" ]; then
-  echo "用法: bash init_admin.sh --app <safeline|artex>"
+  echo "用法: bash init_admin.sh --app <safeline|artex|cyberstrike>"
   exit 1
 fi
 
@@ -70,6 +70,24 @@ case "$APP" in
     fi
     ;;
 
+  cyberstrike)
+    DIR="${CYBERSTRIKE_DIR:-/opt/cyberstrike}"
+    LOGF=""
+    for f in /var/log/cyberstrike.log "$DIR/run.log" "$DIR/cyberstrike.log"; do
+      [ -f "$f" ] && { LOGF="$f"; break; }
+    done
+    echo "==> 取 admin 密码（仅本次输出，请立刻保存）："
+    echo "    首次启动时生成；需要重置用: cd $DIR && ./run.sh --reset-admin-password"
+    echo
+    if [ -n "$LOGF" ]; then
+      grep -aiA6 'ADMIN SETUP REQUIRED' "$LOGF" 2>/dev/null | grep -aiE 'password|密码' | head -3
+    fi
+    if [ -z "$LOGF" ]; then
+      echo "[!] 未找到日志（尝试过 /var/log/cyberstrike.log 与 $DIR/*.log）"
+      echo "    提示：run.sh 是前台程序，用 nohup 启动时日志请自己指定路径。"
+    fi
+    ;;
+
   *)
-    echo "[X] 未知 --app: $APP（可选 safeline | artex）"; exit 1 ;;
+    echo "[X] 未知 --app: $APP（可选 safeline | artex | cyberstrike）"; exit 1 ;;
 esac

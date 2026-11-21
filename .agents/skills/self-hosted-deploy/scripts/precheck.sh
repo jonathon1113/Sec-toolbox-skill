@@ -30,6 +30,13 @@ case "$APP" in
     MIN_MEM=2048
     MIN_DISK=5
     ;;
+  cyberstrike)
+    TITLE="CyberStrikeAI (AI 原生渗透测试平台)"
+    PORTS="8080"
+    PORT_DESC="CyberStrikeAI Web UI 默认端口"
+    MIN_MEM=2048
+    MIN_DISK=5
+    ;;
   artex)
     TITLE="ARTEX (AI 自主渗透测试系统)"
     PORTS="8787"
@@ -125,6 +132,33 @@ case "$APP" in
       echo "检测到已有雷池容器："
       docker ps -a --filter "name=safeline" --format '  {{.Names}}\t{{.Status}}' 2>/dev/null
       echo "  <== 已安装过，如需重装请先与用户确认"
+    fi
+    ;;
+  cyberstrike)
+    if have git; then echo "git         : $(git --version)"; else echo "git         : 缺失  <== 需要 git clone"; FAIL=1; fi
+    if have go; then
+      GOV="$(go version 2>/dev/null | awk '{print $3}' | sed 's/^go//')"
+      echo "Go          : $(go version)"
+      if [ -n "$GOV" ] && [ "$(printf '%s
+1.25
+' "$GOV" | sort -V | head -1)" != "1.25" ]; then
+        echo "Go 版本     : $GOV <== 需要 >= 1.25"; FAIL=1
+      fi
+    else
+      echo "Go          : 缺失  <== 需要 >= 1.25（https://go.dev/dl/）"; FAIL=1
+    fi
+    if have python3; then
+      echo "Python      : $(python3 -V 2>&1)"
+      if ! python3 -c "import venv" >/dev/null 2>&1; then
+        echo "venv 模块   : 缺失  <== 需要 python3-venv（apt install -y python3-venv）"; FAIL=1
+      else
+        echo "venv 模块   : 可用"
+      fi
+    else
+      echo "Python      : 缺失  <== 需要 >= 3.10"; FAIL=1
+    fi
+    if [ -d /opt/cyberstrike ]; then
+      echo "检测到已有 /opt/cyberstrike 目录  <== 可能已安装过，重装前先与用户确认"
     fi
     ;;
   artex)
