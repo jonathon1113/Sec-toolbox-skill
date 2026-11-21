@@ -83,11 +83,14 @@ install_compose() {
     echo "[*] 复用已有 .env"
   fi
 
-  # POSTGRES_PASSWORD 是 compose 里 :? 强制校验项，空则启动失败
-  if ! grep -qE '^POSTGRES_PASSWORD=.+' .env; then
+  # POSTGRES_PASSWORD 是 compose 里 :? 强制校验项，空则启动失败。
+  # 官方 .env.example 里是占位符 change-me-please —— 它“非空”，但绝不能直接用，必须当未设置处理。
+  if grep -qiE '^POSTGRES_PASSWORD=(change-me-please|changeme|change_me|change-me|password|your[-_]?password|)$' .env; then
     PW="$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)"
     sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${PW}|" .env
-    echo "[+] 已生成随机 POSTGRES_PASSWORD（仅写入 .env，不打印）"
+    echo "[+] 已生成随机 POSTGRES_PASSWORD（仅写入 .env，不打印；需要时请自行 cat .env 查看）"
+  else
+    echo "[*] 复用 .env 中已有的 POSTGRES_PASSWORD"
   fi
 
   # 监听地址：默认 127.0.0.1 只允许本机访问，远程部署必须放开
