@@ -131,3 +131,4 @@ bash scripts/verify.sh --app safeline
 | 任意 | 官方脚本要求 TTY | 用 `pty_runner.py` / `script -qec` |
 | 任意 | 改了 daemon.json 但镜像源没生效 | `systemctl restart docker`（daemon 不热加载） |
 | 任意 | 内存 2GB 以下 | 运行时 OOM 风险，建议加内存（swap 只是兜底） |
+| 任意 | 别的机器连不上 9443 | firewalld 未放行；Docker 端口映射**不保证**自动绕过 firewalld | `firewall-cmd --permanent --add-port=9443/tcp && firewall-cmd --reload`，并从另一台机器实测 |

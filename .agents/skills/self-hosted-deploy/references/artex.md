@@ -168,6 +168,20 @@ bash scripts/verify.sh --app artex
 | 启动了但任务不动 | 没配 LLM，engine idle（日志 `no LLM provider configured`） | UI 或 `.env` 里配 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` |
 | `config.json` 里 port 默认 5433 | 官方示例端口是 5433 | 与实际 postgres 映射端口对齐（本例映射 5432） |
 | `pkill -f start.sh` 把自己的会话也杀了 | `-f` 匹配到包含该字符串的当前 shell 命令行 | 用 `pkill -x artex`（精确匹配进程名） |
+| 本机能开、别的机器连不上 | **firewalld 默认只放行 ssh 等默认端口**；ARTEX 是宿主机进程，没有 Docker NAT 兜底 | `firewall-cmd --permanent --add-port=8787/tcp && firewall-cmd --reload`，放行后**从另一台机器实测**确认 |
+| 放行了仍不通 | 绑定了 `127.0.0.1`（binary 模式默认） | `./start.sh -addr 0.0.0.0:8787` |
+
+### 防火墙（binary 模式必做）
+
+ARTEX 以宿主机进程运行，**不像 Docker 映射端口那样有 NAT 兜底**，firewalld 开着就必须显式放行：
+
+```bash
+firewall-cmd --permanent --add-port=8787/tcp
+firewall-cmd --reload
+firewall-cmd --list-ports        # 确认已放行
+```
+
+放行后务必**从另一台机器**实测一次（`curl -sI http://<目标IP>:8787/`），本机 curl 通不代表外部通。
 
 ### 实测可用的一条命令链（binary 模式）
 
