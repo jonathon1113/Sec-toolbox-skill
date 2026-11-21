@@ -183,6 +183,27 @@ firewall-cmd --list-ports        # 确认已放行
 
 放行后务必**从另一台机器**实测一次（`curl -sI http://<目标IP>:8787/`），本机 curl 通不代表外部通。
 
+### 日常运维（binary 模式 + systemd，推荐）
+
+binary 模式是**宿主机进程**，所以 `docker ps` 里**看不到 artex 本身**（只有配套的 postgres 容器）。
+要开机自启与崩溃自愈，注册 systemd 服务（`install_artex.sh --systemd` 会自动写好）：
+
+```bash
+systemctl status artex              # 状态
+systemctl restart artex             # 重启
+journalctl -u artex -f              # 实时日志
+systemctl stop / start artex
+```
+
+systemd 下直接跑 `artex` 二进制，**不要用 `start.sh`** —— start.sh 自带退避重启守护，
+和 systemd 的 Restart 叠加会打架。`start.sh` 留给手动前台/无 systemd 的场景。
+
+> 想让 `docker ps` 里能看到 `artex` 容器 → 用 **compose 模式**（Option 2）：
+> ```bash
+> cd /opt/artex && docker compose up -d --build
+> ```
+> 但要本地构建（无预构建镜像），内存 < 4GB 有 OOM 风险，且会与 binary 模式抢 8787 端口（先停 systemd 服务）。
+
 ### 实测可用的一条命令链（binary 模式）
 
 ```bash

@@ -11,6 +11,7 @@
 #   --bind            compose 模式下的监听地址，默认 0.0.0.0（远程可访问）
 #   --proxy           本次运行使用的代理 host:port（仅本次生效，不落盘、不写进 skill；
 #                     直连 GitHub 超时/404/连接中断时，先问用户有没有可用代理再带上它重跑）
+#   --systemd         安装完成后注册 systemd 服务（开机自启 + 崩溃自动重启），日常用 systemctl 管理
 #
 # 说明: ARTEX 没有可拉的预构建镜像，compose 模式必然本地构建。
 #       密码只写入 .env（该文件不进仓库），交付时再单独告知用户。
@@ -20,6 +21,7 @@ METHOD="compose"
 INSTALL_DIR="/opt/artex"
 BIND_ADDR="0.0.0.0"
 PROXY=""
+USE_SYSTEMD=0
 FORCE=0
 REPO="https://github.com/BaaRai/ARTEX.git"
 
@@ -40,6 +42,8 @@ while [ $# -gt 0 ]; do
     --bind=*) BIND_ADDR="${1#--bind=}"; shift ;;
     --proxy) PROXY="${2:-}"; shift 2 ;;
     --proxy=*) PROXY="${1#--proxy=}"; shift ;;
+    --systemd) USE_SYSTEMD=1; shift ;;
+    --no-systemd) USE_SYSTEMD=0; shift ;;
     --force) FORCE=1; shift ;;
     *) echo "[!] 未知参数: $1"; shift ;;
   esac
@@ -213,10 +217,46 @@ except Exception:
     echo "    没有现成 PostgreSQL 时，可先起一个："
     echo "    docker run -d --name artex-pg -p 5432:5432 -e POSTGRES_USER=artex -e POSTGRES_PASSWORD=<pw> -e POSTGRES_DB=artex -v artex-pg:/var/lib/postgresql/data postgres:16-alpine"
   fi
-  echo "==> 启动（binary 模式的监听地址用 -addr 参数，不是 ARTEX_BIND_ADDR）:"
-  echo "    对外可访问: cd $APP_DIR && setsid nohup ./start.sh -addr 0.0.0.0:8787 > artex.log 2>&1 < /dev/null &"
-  echo "    仅本机:     cd $APP_DIR && setsid nohup ./start.sh > artex.log 2>&1 < /dev/null &"
-  echo "    注意 start.sh 是守护脚本，不要直接运行 ./artex"
+  if [ "$USE_SYSTEMD" = "1" ]; then
+    echo "==> 注册 systemd 服务（开机自启 + 自动重启）"
+    local unit=/etc/systemd/system/artex.service
+    cat > "$unit" <<UNIT
+[Unit]
+Description=ARTEX - AI autonomous penetration testing console
+Documentation=https://github.com/BaaRai/ARTEX
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${APP_DIR}
+ExecStart=${APP_DIR}/artex -addr 0.0.0.0:8787
+Environment=ARTEX_CONFIG=${APP_DIR}/config.json
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    systemctl daemon-reload
+    systemctl enable artex >/dev/null 2>&1 && echo "[+] 已 enable，开机自启"
+    systemctl restart artex 2>&1|tail -1
+    sleep 8
+    systemctl is-active artex
+    echo "    日常: systemctl start|stop|restart artex ; journalctl -u artex -f"
+  else
+    echo "==> 启动（binary 模式的监听地址用 -addr 参数，不是 ARTEX_BIND_ADDR）:"
+    echo "    对外可访问: cd $APP_DIR && setsid nohup ./start.sh -addr 0.0.0.0:8787 > artex.log 2>&1 < /dev/null &"
+    echo "    仅本机:     cd $APP_DIR && setsid nohup ./start.sh > artex.log 2>&1 < /dev/null &"
+    echo "    注意 start.sh 是守护脚本，不要直接运行 ./artex"
+    echo "    想开机自启请加 --systemd 参数"
+  fi
   echo "APP_DIR=$APP_DIR"
 }
 
