@@ -5,9 +5,14 @@ compatibility: <环境要求，如 Linux x86_64/arm64，需 root>
 metadata:
   version: 1.0.0
   upstream_doc: <官方文档链接>
+  supported_apps: [<app>]      # 多软件 skill 才需要，单软件可删
 ---
 
 # <工具名> 部署
+
+> 本模板是**单软件**骨架。若要一个 skill 管多个软件（通用流程 + 每软件一份 references/install 脚本），
+> 见 `.agents/skills/skill-authoring/SKILL.md` 的「一个 skill 管多个软件」小节，
+> 参照 `.agents/skills/self-hosted-deploy/`。
 
 官方文档：<链接>
 

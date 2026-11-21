@@ -8,7 +8,7 @@
 .
 ├── .agents/skills/               # 所有 skill（pi / Claude Code 等遵循 Agent Skills 规范的 Agent 均可发现）
 │   ├── linux-docker-env/         # 容器底座：检查/安装 Docker + Compose
-│   ├── safeline-waf-install/     # 雷池 SafeLine CE WAF 部署
+│   ├── self-hosted-deploy/       # 自托管服务/安全工具部署（雷池 WAF、ARTEX 等）
 │   └── skill-authoring/          # 新增 skill 的规范
 ├── templates/skill-template/     # 复制即用的新 skill 骨架
 ├── AGENTS.md
@@ -20,7 +20,7 @@
 | Skill | 作用 | 触发场景 |
 |---|---|---|
 | `linux-docker-env` | 检查并安装 Docker / Docker Compose，配置国内镜像加速 | 搭建容器环境、"docker not found"、拉镜像超时 |
-| `safeline-waf-install` | 雷池 SafeLine 社区版 WAF 全流程部署 | 装雷池、部署 WAF、反代防护网站、重置管理员密码 |
+| `self-hosted-deploy` | 自托管服务 / 安全工具统一部署（当前支持 雷池 SafeLine CE、ARTEX） | 装雷池、部署 WAF、装 ARTEX、AI 渗透测试平台、部署某个 Docker 化开源工具 |
 | `skill-authoring` | 新增部署类 skill 的规范 | "再加一个 XX 工具的部署 skill" |
 
 ## 核心思路
@@ -30,6 +30,10 @@
 ```
 前置检查（只读） → 依赖检查（Docker） → 安装（官方方式） → 初始化 → 自检 → 交付说明
 ```
+
+`self-hosted-deploy` 采用**一个 skill 管多个软件**的结构：SKILL.md 只放通用流程与路由表，
+每个软件一个 `references/<app>.md`（专有坑位）+ `scripts/install_<app>.sh`（官方安装方式），
+`precheck.sh` / `init_admin.sh` / `verify.sh` 用 `--app <name>` 分支。新增软件只加这三处。
 
 关键约束：
 
@@ -57,7 +61,7 @@ cp -r .agents/skills/* ~/.agents/skills/
 之后在 pi 里：
 
 ```
-/skill:safeline-waf-install
+/skill:self-hosted-deploy
 ```
 
 或直接描述需求（"帮我在这台服务器上装雷池 WAF"），模型会自动加载对应 skill。
@@ -67,7 +71,7 @@ cp -r .agents/skills/* ~/.agents/skills/
 所有脚本都可以脱离 Agent 直接跑：
 
 ```bash
-bash .agents/skills/safeline-waf-install/scripts/precheck.sh
+bash .agents/skills/self-hosted-deploy/scripts/precheck.sh --app safeline
 bash .agents/skills/linux-docker-env/scripts/check_env.sh
 ```
 
@@ -89,6 +93,7 @@ cp -r templates/skill-template .agents/skills/<new-skill>
 | 雷池添加应用 | https://help.waf-ce.chaitin.cn/node/01973fc6-e14a-7234-8acd-bdba21c8b3f3 |
 | 雷池常见问题排查 | https://help.waf-ce.chaitin.cn/node/01975855-cd7b-78fb-a354-d2aa65a53cce |
 | 轩辕镜像 Docker 一键安装 | https://xuanyuan.cloud/install/linux |
+| ARTEX（AI 自主渗透测试系统） | https://github.com/BaaRai/ARTEX |
 
 > 官方文档会更新。使用前建议核对上游链接的最新内容，skill 内脚本中的命令以官方为准。
 
