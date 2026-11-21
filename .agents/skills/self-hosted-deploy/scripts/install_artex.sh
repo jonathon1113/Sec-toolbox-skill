@@ -100,15 +100,28 @@ install_compose() {
   fi
 
   echo "==> 构建并启动（首次构建需下载依赖并编译，可能 10~30 分钟）"
-  if ! docker compose up -d --build; then
+  # 注意：BuildKit **不读**客户端的 http_proxy 环境变量，构建阶段拉不到外网时必须用 --build-arg 显式传代理
+  local BUILD_ARGS=()
+  if [ -n "$PROXY" ]; then
+    BUILD_ARGS=(--build-arg "HTTP_PROXY=http://${PROXY}" --build-arg "HTTPS_PROXY=http://${PROXY}"
+                --build-arg "http_proxy=http://${PROXY}" --build-arg "https_proxy=http://${PROXY}")
+    echo "    构建阶段使用代理: ${PROXY}"
+  fi
+  if ! docker compose build "${BUILD_ARGS[@]}"; then
     echo
-    echo "[X] Docker 构建或启动失败。处置顺序（先解决问题，再考虑降级）："
+    echo "[X] 镜像构建失败。处置顺序（先解决问题，再考虑降级）："
     echo "    1) 看具体报错: cd $INSTALL_DIR && docker compose build 2>&1 | tail -30"
-    echo "    2) 若是 OOM/被 kill → 加内存（>=4GB）或加 swap: fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile"
-    echo "    3) 若是拉基础镜像失败 → 配镜像加速源（见 SKILL.md 第 2.5 步）"
-    echo "    4) 若是 npm/Go 依赖下载失败 → 检查代理/网络"
+    echo "    2) 若是 go mod download 超时 → 构建阶段没走代理，用 --proxy <host:port> 重跑"
+    echo "       （BuildKit 不读宿主机的 http_proxy 环境变量，必须由脚本用 --build-arg 传入）"
+    echo "    3) 若是 OOM/被 kill → 加内存（>=4GB）或加 swap: fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile"
+    echo "    4) 若是拉基础镜像失败 → 配镜像加速源（见 SKILL.md 第 2.5 步）"
     echo "    5) 以上都解决不了再降级: bash install_artex.sh --method binary --dir $INSTALL_DIR ${PROXY:+--proxy $PROXY}"
     echo "       （降级后 ARTEX 变成宿主机进程，docker ps 里不再有 artex 容器，交付时必须说明）"
+    exit 1
+  fi
+  if ! docker compose up -d; then
+    echo
+    echo "[X] 容器启动失败。排查: cd $INSTALL_DIR && docker compose logs --tail 50 artex"
     exit 1
   fi
 
