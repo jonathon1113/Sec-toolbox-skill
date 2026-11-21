@@ -14,12 +14,14 @@
 #   --http        以明文 HTTP 启动（默认官方是 HTTPS + 自签证书）
 #   --proxy       本次运行使用的代理 host:port（仅本次生效，不落盘）
 #   --foreground  前台运行（调试用）；默认后台跑并写 /var/log/cyberstrike.log
+#   --systemd     注册 systemd 服务（开机自启 + 崩溃自愈），日常用 systemctl 管理
 set -uo pipefail
 
 INSTALL_DIR="/opt/cyberstrike"
 USE_HTTP=0
 PROXY=""
 FOREGROUND=0
+USE_SYSTEMD=1
 REPO="https://github.com/AIPentest/CyberStrikeAI.git"
 LOG="/var/log/cyberstrike.log"
 
@@ -31,6 +33,8 @@ while [ $# -gt 0 ]; do
     --proxy) PROXY="${2:-}"; shift 2 ;;
     --proxy=*) PROXY="${1#--proxy=}"; shift ;;
     --foreground) FOREGROUND=1; shift ;;
+    --systemd) USE_SYSTEMD=1; shift ;;
+    --no-systemd) USE_SYSTEMD=0; shift ;;
     *) echo "[!] 未知参数: $1"; shift ;;
   esac
 done
@@ -149,6 +153,50 @@ done
 echo
 echo "==> 启动输出（末尾）:"
 tail -25 "$LOG" 2>/dev/null
+# ---------- systemd 托管 ----------
+if [ "$USE_SYSTEMD" = "1" ] && [ "$FOREGROUND" != "1" ]; then
+  echo
+  echo "==> 注册 systemd 服务（开机自启 + 自动重启）"
+  cat > /etc/systemd/system/cyberstrike.service <<UNIT
+[Unit]
+Description=CyberStrikeAI - AI-native cybersecurity platform
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${INSTALL_DIR}
+ExecStart=${INSTALL_DIR}/cyberstrike-ai -config ${INSTALL_DIR}/config.yaml $( [ "$USE_HTTP" = "1" ] && echo "--http" || echo "--https" )
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  # 先停掉用 run.sh 起的实例：它占着 8080，systemd 的实例会因端口冲突退出（auto-restart 循环）
+  if pgrep -x cyberstrike-ai >/dev/null 2>&1; then
+    echo "[*] 停止已有 cyberstrike-ai 进程（避免与 systemd 实例抢 8080）"
+    pkill -x cyberstrike-ai
+    for i in $(seq 1 15); do
+      pgrep -x cyberstrike-ai >/dev/null 2>&1 || break
+      sleep 1
+    done
+  fi
+  systemctl daemon-reload
+  systemctl enable cyberstrike >/dev/null 2>&1 && echo "[+] 已 enable，开机自启"
+  systemctl restart cyberstrike 2>&1 | tail -1
+  sleep 6
+  systemctl is-active cyberstrike
+  echo "    日常: systemctl status|restart cyberstrike ; journalctl -u cyberstrike -f"
+  echo "    注意：systemd 下直接跑二进制，不用 run.sh（run.sh 会每次重新构建）"
+fi
+
 echo
 echo "==> 下一步："
 echo "    1) 取 admin 密码: bash scripts/init_admin.sh --app cyberstrike"
