@@ -97,7 +97,17 @@ install_compose() {
   fi
 
   echo "==> 构建并启动（首次构建需下载依赖并编译，可能 10~30 分钟）"
-  docker compose up -d --build || { echo "[X] 构建或启动失败，详见 docker compose logs"; exit 1; }
+  if ! docker compose up -d --build; then
+    echo
+    echo "[X] Docker 构建或启动失败。处置顺序（先解决问题，再考虑降级）："
+    echo "    1) 看具体报错: cd $INSTALL_DIR && docker compose build 2>&1 | tail -30"
+    echo "    2) 若是 OOM/被 kill → 加内存（>=4GB）或加 swap: fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile"
+    echo "    3) 若是拉基础镜像失败 → 配镜像加速源（见 SKILL.md 第 2.5 步）"
+    echo "    4) 若是 npm/Go 依赖下载失败 → 检查代理/网络"
+    echo "    5) 以上都解决不了再降级: bash install_artex.sh --method binary --dir $INSTALL_DIR ${PROXY:+--proxy $PROXY}"
+    echo "       （降级后 ARTEX 变成宿主机进程，docker ps 里不再有 artex 容器，交付时必须说明）"
+    exit 1
+  fi
 
   echo
   echo "==> 启动完成。取一次性 setup token："

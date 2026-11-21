@@ -22,18 +22,32 @@ AI 驱动的自主渗透测试平台：双图架构（探索图 + 资产图）�
 6. 交付：地址 + setup token + LLM key 配置提示
 ```
 
-## 关键决策：构建 vs 预编译二进制
+## 关键决策：Docker 优先（构建 vs 预编译二进制）
 
-| 路径 | 内存需求 | 耗时 | 适用 |
-|---|---|---|---|
-| **A. `docker compose up -d --build`**（README Option 2，官方推荐） | **≥ 4 GB 建议**（前端 `npm ci` + Go 编译同时吃内存） | 10~30 分钟 | 机器内存 ≥ 4GB 的常规场景 |
-| **B. release 预编译二进制**（README Option 3） | ≥ 2 GB | 5 分钟 | **小内存机器（2GB 级）首选** |
-| C. 源码构建单二进制（Option 4） | ≥ 4 GB | 20+ 分钟 | 需要改代码时 |
+**默认走 A（Docker Compose）。** 只有在 A 确实跑不通时才降级到 B。
 
-> ⚠️ **实测教训类推**：2 GB 物理内存的机器上，`npm ci` + `go build` 极易 OOM。
-> 内存 < 4 GB 时优先走路径 B，或让用户加内存后再走 A。
+| 路径 | 优先级 | 内存需求 | 耗时 | 形态 |
+|---|---|---|---|---|
+| **A. `docker compose up -d --build`**（README Option 2，官方推荐） | **首选** | 建议 ≥ 4 GB（前端 `npm ci` + Go 编译同时吃内存） | 10~30 分钟 | 容器：`artex` + `postgres`，`docker ps` 可见 |
+| B. release 预编译二进制（README Option 3） | 降级 | ≥ 2 GB | 5 分钟 | 宿主机进程 + postgres 容器 |
+| C. 源码构建单二进制（Option 4） | 最后兜底 | ≥ 4 GB | 20+ 分钟 | 宿主机进程 |
 
-## 路径 A：全 Docker（官方推荐）
+### A 跑不通时，先解决问题，再降级
+
+**不要一看到内存不足就直接用二进制** —— 正确顺序是：
+
+1. **加内存**（首选）：机器加到 4GB+；
+2. **加 swap**：`fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile`，并写入 `/etc/fstab`；
+3. **降低构建并发**：`npm config set maxsockets 3`、`COMPOSE_PARALLEL_LIMIT=1 docker compose build`；
+4. 以上都做不到，**再降级到 B**，并在交付时写清楚"为什么没用 Docker"。
+
+> 降级到 B 的代价：ARTEX 变成**宿主机进程**（`docker ps` 里只有 postgres，看不到 artex），
+> 卸载/升级/开机自启/备份方式都与 Docker 不同，交付说明里必须写明。
+
+> ⚠️ 实测：2 GB 物理内存的机器上，`npm ci` + `go build` 极易 OOM；
+> 当时 .3 有 2GB swap 兼底，才改走 B（实测记录，详见文末踩坑表）。
+
+## 路径 A：全 Docker（首选，官方推荐）
 
 ```bash
 git clone https://github.com/BaaRai/ARTEX.git /opt/artex
@@ -57,7 +71,7 @@ docker compose up -d --build
 
 持久化：`./skills` 与 `./data` 用 bind mount 挂在宿主机上，**别删这两个目录**。
 
-## 路径 B：预编译二进制（小内存机器）
+## 路径 B：预编译二进制（降级方案，仅在 A 跑不通时用）
 
 ```bash
 cd /opt

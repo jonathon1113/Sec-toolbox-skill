@@ -87,7 +87,9 @@ if [ "$MEM_MB" -gt 0 ] && [ "$MEM_MB" -lt "$MIN_MEM" ]; then
   # swap >= 1024 MB 即可作为兜底（2047/2048 这类边界很常见，别卡在这里）
   if [ "$SWAP_MB" -ge 1024 ]; then
     if [ "$APP" = "artex" ]; then
-      echo "  <== 内存不足；有 ${SWAP_MB} MB swap 兜底。建议改用 release 预编译二进制路径（见 references/artex.md）"
+      echo "  <== 内存不足；有 ${SWAP_MB} MB swap 兜底。"
+      echo "      Docker 方案（compose 构建）建议 >= 4GB：请优先加内存或加 swap 后再走 Docker 方案；"
+      echo "      实在不够再考虑二进制降级方案（见 references/artex.md）。"
     else
       echo "  <== 内存不足；有 ${SWAP_MB} MB swap 兜底，但运行时可能 OOM，建议加物理内存"
     fi
