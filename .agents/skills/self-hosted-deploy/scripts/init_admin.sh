@@ -80,7 +80,7 @@ case "$APP" in
     echo "    首次启动时生成；需要重置用: cd $DIR && ./run.sh --reset-admin-password"
     echo
     if [ -n "$LOGF" ]; then
-      grep -aiA6 'ADMIN SETUP REQUIRED' "$LOGF" 2>/dev/null | grep -aiE 'password|密码' | head -3
+      grep -aiA6 'ADMIN SETUP REQUIRED' "$LOGF" 2>/dev/null         | grep -aiE '^[[:space:]]*(password|密码)' | head -1         | sed -E 's/^[[:space:]]*([Pp]assword|密码)[[:space:]]*[:：]?[[:space:]]*/密码: /'
     fi
     if [ -z "$LOGF" ]; then
       echo "[!] 未找到日志（尝试过 /var/log/cyberstrike.log 与 $DIR/*.log）"

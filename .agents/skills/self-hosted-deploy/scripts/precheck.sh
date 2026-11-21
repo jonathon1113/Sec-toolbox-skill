@@ -149,13 +149,30 @@ case "$APP" in
     fi
     if have python3; then
       echo "Python      : $(python3 -V 2>&1)"
-      if ! python3 -c "import venv" >/dev/null 2>&1; then
-        echo "venv 模块   : 缺失  <== 需要 python3-venv（apt install -y python3-venv）"; FAIL=1
+      # 必须**真实创建**一次 venv：Debian 上 `import venv` 能过，但没有 python3-venv 包时
+      # 创建会因缺 ensurepip/pip 失败（run.sh 报 "Failing command: venv/bin/python3"）
+      if python3 -m venv /tmp/_venv_probe >/dev/null 2>&1; then
+        rm -rf /tmp/_venv_probe
+        echo "venv 模块   : 可用（已实测创建）"
       else
-        echo "venv 模块   : 可用"
+        rm -rf /tmp/_venv_probe
+        echo "venv 模块   : 创建失败  <== 缺 python3-venv（apt install -y python3-venv / yum install -y python3-pip）"
+        FAIL=1
       fi
     else
       echo "Python      : 缺失  <== 需要 >= 3.10"; FAIL=1
+    fi
+    if have node; then
+      NODEV="$(node -v 2>/dev/null | sed 's/^v//')"
+      echo "Node       : $(node -v)"
+      if [ -n "$NODEV" ] && [ "$(printf '%s
+22.19
+' "$NODEV" | sort -V | head -1)" != "22.19" ]; then
+        echo "Node 版本  : $NODEV <== run.sh 的 Pi agent runtime 需要 >= 22.19"; FAIL=1
+      fi
+    else
+      echo "Node       : 缺失  <== run.sh 需要 Node >= 22.19（Pi agent runtime）"
+      echo "             安装: https://nodejs.org/dist/ 或 NodeSource setup_22.x"; FAIL=1
     fi
     if [ -d /opt/cyberstrike ]; then
       echo "检测到已有 /opt/cyberstrike 目录  <== 可能已安装过，重装前先与用户确认"

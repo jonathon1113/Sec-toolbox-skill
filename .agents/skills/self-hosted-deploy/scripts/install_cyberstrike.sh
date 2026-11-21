@@ -76,6 +76,23 @@ else
   exit 1
 fi
 
+if need_cmd node; then
+  NODEV="$(node -v 2>/dev/null | sed 's/^v//')"
+  echo "Node       : $(node -v)"
+  if [ -n "$NODEV" ] && [ "$(printf '%s
+22.19
+' "$NODEV" | sort -V | head -1)" != "22.19" ]; then
+    echo "[X] Node 版本过低（run.sh 的 Pi agent runtime 需要 >= 22.19，当前 $NODEV）。"
+    echo "    安装: https://nodejs.org/dist/ 或 NodeSource setup_22.x"
+    exit 1
+  fi
+else
+  echo "[X] 未检测到 node（run.sh 需要 Node >= 22.19，用于 Pi agent runtime）。"
+  echo "    README 的 Prerequisites 里没写这一条，但缺了 run.sh 会直接失败。"
+  echo "    安装: https://nodejs.org/dist/ 或 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -"
+  exit 1
+fi
+
 if ! need_cmd git; then
   echo "[X] 未检测到 git。请先安装（yum install -y git / apt install -y git）。"
   exit 1
@@ -88,7 +105,13 @@ if [ -d "$INSTALL_DIR/.git" ]; then
 else
   echo "==> 克隆代码到 $INSTALL_DIR"
   mkdir -p "$(dirname "$INSTALL_DIR")"
-  git clone --depth 1 "$REPO" "$INSTALL_DIR" || { echo "[X] clone 失败（网络不通？）"; exit 1; }
+  if ! timeout 600 git clone --depth 1 "$REPO" "$INSTALL_DIR"; then
+    echo "[X] clone 失败或超时（仓库较大，直连 GitHub 可能很慢）。"
+    echo "    处理：① 用代理重跑: bash install_cyberstrike.sh --proxy <host:port>"
+    echo "          ② 或先在本地 clone 再传上目标机"
+    rm -rf "$INSTALL_DIR"
+    exit 1
+  fi
 fi
 
 cd "$INSTALL_DIR" || exit 1

@@ -40,9 +40,23 @@ GOPROXY=https://goproxy.cn,direct
 |---|---|---|
 | Go | **1.25+**（`go.mod` 要求） | 装：官方 go.dev/dl；或 `yum install golang` / `apt install golang-go` |
 | Python | **3.10+**，且带 `venv` 模块 | `yum install -y python3 python3-pip` / `apt install -y python3 python3-venv` |
+| Node.js | **>= 22.19** | `run.sh` 的 "Pi agent runtime" 需要；README 的 Prerequisites 里**没写**，缺失时报 `Pi requires Node.js >=22.19: exec: "node": executable file not found in $PATH` |
 | 端口 | 8080 空闲（`config.yaml` 的 `server.port`） | 先查占用方 |
 | 磁盘 | ≥ 5 GB | 中止 |
 | 内存 | ≥ 2 GB | 报告 |
+
+Node.js 安装（>= 22.19）：
+
+```bash
+# 官方 tarball
+curl -fsSL -o node.tar.xz https://nodejs.org/dist/v22.21.1/node-v22.21.1-linux-x64.tar.xz
+sudo mkdir -p /usr/local/lib/nodejs && sudo tar -C /usr/local/lib/nodejs --strip-components=1 -xJf node.tar.xz
+sudo ln -sf /usr/local/lib/nodejs/bin/node /usr/local/bin/node
+sudo ln -sf /usr/local/lib/nodejs/bin/npm  /usr/local/bin/npm
+
+# 或 NodeSource
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+```
 
 Debian/Ubuntu 缺 venv 时：`apt install -y python3-venv`（否则 `python3 -m venv` 会失败）。
 
@@ -140,6 +154,7 @@ sudo apt install -y nmap masscan sqlmap nikto gobuster hydra hashcat john binwal
 | 浏览器证书告警 | 自签证书 | 接受一次；或换正式证书 |
 | 用 IP 访问证书不匹配 | 自签 SAN 只有 localhost/127.0.0.1 | 配 `tls_cert_path`/`tls_key_path`，或用 `--http` |
 | `python3 -m venv` 失败 | 缺 python3-venv | `apt install -y python3-venv` |
+| `Failing command: <目录>/venv/bin/python3` | 上次 run.sh 中断留下的**半成品 venv** | `rm -rf <安装目录>/venv` 后重跑 run.sh |
 | go build 拉依赖超时 | GOPROXY 不通 | run.sh 默认已用 goproxy.cn；不通则 `export GOPROXY=https://goproxy.cn,direct` |
 | pip 安装慢/超时 | pip 源不通 | run.sh 默认已用清华源；不通则 `export PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple` |
 | 端口 8080 被占用 | 其它服务 | 改 `config.yaml` 的 `server.port` |
