@@ -1,9 +1,9 @@
 ---
 name: safeline-waf-install
-description: 在 Linux 主机上部署长亭雷池 SafeLine 社区版 WAF。当用户提到"装雷池"、"部署 WAF"、"SafeLine"、"下一代 Web 应用防火墙"、需要反代防护网站、或需要重置雷池管理员密码时使用。会先检查 Docker 环境（缺失则用轩辕镜像脚本补装），再执行官方一键安装并完成控制台初始化与自检。
+description: 在 Linux 主机上部署长亭雷池 SafeLine 社区版 WAF。当用户提到"装雷池"、"部署 WAF"、"SafeLine"、"下一代 Web 应用防火墙"、需要反代防护网站时使用。先检查 Docker 环境（缺失则用轩辕镜像脚本补装），再执行官方一键安装并完成控制台初始化与自检。若用户只问某个子项（拉镜像慢/换镜像源、忘记密码、控制台打不开），只处理那一项，不要走完整部署流程。
 compatibility: Linux (x86_64 需支持 ssse3 / arm64)，需 root 权限，至少 1 核 2G 内存 5G 磁盘
 metadata:
-  version: 1.0.0
+  version: 1.1.0
   upstream_doc: https://help.waf-ce.chaitin.cn/node/01973fc6-df0f-7650-bafa-8ed8d2fc2bc1
   product: SafeLine CE (雷池社区版)
 ---
@@ -11,6 +11,20 @@ metadata:
 # 雷池 WAF (SafeLine CE) 部署
 
 按官方文档 <https://help.waf-ce.chaitin.cn/node/01973fc6-df0f-7650-bafa-8ed8d2fc2bc1> 的流程执行，并在每一步做前置校验，避免走弯路。
+
+## 先判请求：只做用户要的那部分
+
+**先看用户到底要什么，再决定执行哪些步骤。只做被要求的那些，不要顺手把整套流程跑完。**
+
+| 用户说的是 | 只执行 | 不要执行 |
+|---|---|---|
+| 装雷池 / 部署 WAF / 这台机器装一下 | 第 0~6 步（完整流程） | — |
+| 拉镜像慢 / 换镜像源 / docker 拉不动 | 第 2 步的镜像源部分 + `linux-docker-env` 的测速换源 | 第 3~5 步（不要安装雷池） |
+| 忘记密码 / 重置 admin 密码 | 第 4 步 | 第 1~3 步 |
+| 控制台打不开 / 访问不了 / 报错 | 第 5 步自检 + `references/故障排查.md` | 第 3~4 步 |
+| 能不能装 / 够不够条件 | 第 1 步 | 第 2~6 步 |
+
+> 已安装的环境遇到子项请求时，不要重装雷池。例：用户说"雷池拉镜像慢"，若主机上已有雷池容器，只换镜像源并验证，不重跑安装脚本。
 
 ## 整体流程
 
