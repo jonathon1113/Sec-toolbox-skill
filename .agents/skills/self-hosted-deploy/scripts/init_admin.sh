@@ -34,13 +34,36 @@ case "$APP" in
     ;;
 
   artex)
-    if ! docker ps -a --format '{{.Names}}' | grep -qE '(^|-)artex$'; then
-      echo "[X] 未找到 artex 容器，ARTEX 似乎未安装。"; exit 1
+    # 两种运行形态：
+    #   compose 模式 → token 在容器日志里
+    #   binary  模式 → token 在进程 stderr / artex.log 里
+    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qE '(^|-)artex$'; then
+      echo "==> 取一次性 setup token（compose 模式，仅本次输出，请立刻保存）："
+      echo "    用于首次访问 /setup 完成认领；认领后失效。"
+      echo
+      docker logs artex 2>&1 | grep -i "setup token" | tail -3
+    else
+      APP_DIR="${ARTEX_DIR:-/opt/artex}"
+      FOUND=0
+      for d in "$APP_DIR" "$APP_DIR"/*/; do
+        [ -f "$d/artex.log" ] || continue
+        TOK="$(grep -aioE "setup token for the /setup page: [0-9a-f]+" "$d/artex.log" 2>/dev/null | tail -1 | grep -oE "[0-9a-f]{16,}")"
+        if [ -n "$TOK" ]; then
+          echo "==> 取一次性 setup token（binary 模式，仅本次输出，请立刻保存）："
+          echo "    用于首次访问 /setup 完成认领；认领后失效。"
+          echo
+          echo "$TOK"
+          FOUND=1
+          break
+        fi
+      done
+      if [ "$FOUND" = "0" ]; then
+        echo "[!] 未在 artex.log 里找到 setup token。"
+        echo "    排查：ps aux | grep artex；日志一般在 <安装目录>/artex.log"
+        echo "    若容器重启过，token 会重新生成，请重新查看日志。"
+        exit 1
+      fi
     fi
-    echo "==> 取一次性 setup token（仅本次输出，请立刻保存）："
-    echo "    用于首次访问 /setup 完成认领；认领后失效。"
-    echo
-    docker logs artex 2>&1 | grep -i "setup token" | tail -3
     ;;
 
   *)

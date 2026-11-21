@@ -9,6 +9,8 @@
 #   --method compose  官方推荐的 compose 构建路径（内存 >= 4GB）
 #   --method binary   预编译二进制路径（小内存机器首选）
 #   --bind            compose 模式下的监听地址，默认 0.0.0.0（远程可访问）
+#   --proxy           本次运行使用的代理 host:port（仅本次生效，不落盘、不写进 skill；
+#                     直连 GitHub 超时/404/连接中断时，先问用户有没有可用代理再带上它重跑）
 #
 # 说明: ARTEX 没有可拉的预构建镜像，compose 模式必然本地构建。
 #       密码只写入 .env（该文件不进仓库），交付时再单独告知用户。
@@ -17,8 +19,16 @@ set -uo pipefail
 METHOD="compose"
 INSTALL_DIR="/opt/artex"
 BIND_ADDR="0.0.0.0"
+PROXY=""
 FORCE=0
 REPO="https://github.com/BaaRai/ARTEX.git"
+
+# 代理仅本次生效（不写入任何文件，也不硬编码在 skill 里）
+if [ -n "$PROXY" ]; then
+  export http_proxy="http://${PROXY}" https_proxy="http://${PROXY}"
+  export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy"
+  echo "[*] 本次使用代理: ${PROXY}"
+fi
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -28,6 +38,8 @@ while [ $# -gt 0 ]; do
     --dir=*) INSTALL_DIR="${1#--dir=}"; shift ;;
     --bind) BIND_ADDR="${2:-}"; shift 2 ;;
     --bind=*) BIND_ADDR="${1#--bind=}"; shift ;;
+    --proxy) PROXY="${2:-}"; shift 2 ;;
+    --proxy=*) PROXY="${1#--proxy=}"; shift ;;
     --force) FORCE=1; shift ;;
     *) echo "[!] 未知参数: $1"; shift ;;
   esac
@@ -97,24 +109,115 @@ install_binary() {
   if ! command -v unzip >/dev/null 2>&1; then
     echo "[X] 缺少 unzip，请先安装（apt install -y unzip / yum install -y unzip）"; exit 1
   fi
-  echo "[!] 需要从 https://github.com/BaaRai/ARTEX/releases 下载对应平台 zip 后放到 $INSTALL_DIR"
-  echo "    下载后再次执行: bash install_artex.sh --method binary --dir $INSTALL_DIR"
-  echo "    官方提供 SHA256SUMS 校验: sha256sum -c SHA256SUMS"
-  echo "    放好后本脚本会继续解压并生成 config.json"
-  ZIP="$(ls "$INSTALL_DIR"/*.zip 2>/dev/null | head -1)"
-  [ -z "$ZIP" ] && { echo "[X] $INSTALL_DIR 下没有找到 zip，请先下载"; exit 1; }
 
+  mkdir -p "$INSTALL_DIR"
   cd "$INSTALL_DIR" || exit 1
-  unzip -o "$(basename "$ZIP")" >/dev/null || { echo "[X] 解压失败"; exit 1; }
+
+  ZIP=""
+  if ls ./*.zip >/dev/null 2>&1; then
+    ZIP="$(ls ./*.zip | head -1)"
+    echo "[*] 使用已有压缩包: $ZIP"
+  else
+    echo "==> 从 GitHub Releases 获取最新版本"
+    local arch
+    case "$(uname -m)" in
+      x86_64) arch="amd64" ;;
+      aarch64|arm64) arch="arm64" ;;
+      *) echo "[X] 不支持的架构: $(uname -m)"; exit 1 ;;
+    esac
+    if ! command -v python3 >/dev/null 2>&1; then
+      echo "[X] 需要 python3 来查询 GitHub Releases"; exit 1
+    fi
+    # 用 API 的 assets 列表取**真实**资产名与下载 URL（命名规则会变，猜名字会 404）
+    local ASSET_URL ASSET_NAME
+    ASSET_URL=$(python3 - "$arch" <<'PYEOF' 2>/dev/null
+import json, sys, urllib.request
+arch = sys.argv[1]
+try:
+    d = json.load(urllib.request.urlopen(
+        'https://api.github.com/repos/BaaRai/ARTEX/releases/latest', timeout=30))
+except Exception:
+    sys.exit(0)
+for a in d.get('assets', []):
+    n = a.get('name', '')
+    if n.endswith('-linux-%s.zip' % arch):
+        print(a.get('browser_download_url', ''))
+        break
+PYEOF
+)
+    if [ -z "$ASSET_URL" ]; then
+      echo "[X] 未能从 GitHub API 解析出 linux-${arch} 的资产（可能触发了 API 限流）。"
+      echo "    处理：稍后重试；或手动到 https://github.com/BaaRai/ARTEX/releases 下载"
+      echo "    对应平台的 zip，放到 $INSTALL_DIR 后再执行本脚本（脚本会直接用已有 zip）。"
+      exit 1
+    fi
+    ASSET_NAME="$(basename "$ASSET_URL")"
+    TAG="$(python3 -c "
+import json,urllib.request
+try:
+    d=json.load(urllib.request.urlopen('https://api.github.com/repos/BaaRai/ARTEX/releases/latest',timeout=20))
+    print(d.get('tag_name',''))
+except Exception:
+    print('')
+" 2>/dev/null)"
+    echo "[+] 最新版本: ${TAG:-未知}   资产: $ASSET_NAME"
+    echo "==> 下载 $ASSET_URL"
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL --retry 3 --retry-delay 2 -C - -o "$ASSET_NAME" "$ASSET_URL" || {
+        echo "[X] 下载失败。若为超时/连接中断，说明到 GitHub 的网络不通："
+        echo "    先重试；仍失败则**向用户询问是否有可用代理**，再用 --proxy <host:port> 重跑本脚本。"
+        exit 1; }
+    else
+      echo "[X] 需要 curl 才能下载"; exit 1
+    fi
+    ZIP="$ASSET_NAME"
+    # 官方提供 SHA256SUMS，一并下载校验
+    SUM_URL="https://github.com/BaaRai/ARTEX/releases/download/${TAG}/SHA256SUMS"
+    if [ -n "$TAG" ] && curl -fsSL --max-time 60 -o SHA256SUMS "$SUM_URL" 2>/dev/null; then
+      # 注意：CentOS 7 的 coreutils 不支持 sha256sum --ignore-missing，用 grep 过滤目标行代替
+      if grep -F " $ASSET_NAME" SHA256SUMS > .sha_line 2>/dev/null && [ -s .sha_line ]; then
+        if sha256sum -c .sha_line >/dev/null 2>&1; then
+          echo "[+] SHA256 校验通过"
+        else
+          echo "[X] SHA256 校验不通过！文件可能已损坏或被篡改，停止安装。"
+          rm -f .sha_line
+          exit 1
+        fi
+        rm -f .sha_line
+      else
+        echo "[!] SHA256SUMS 里没有 $ASSET_NAME 的条目，未校验（请人工确认来源）"
+      fi
+    else
+      echo "[!] 未取到 SHA256SUMS，未做完整性校验（请人工确认来源）"
+    fi
+  fi
+
+  echo "==> 解压"
+  unzip -o "$ZIP" >/dev/null || { echo "[X] 解压失败"; exit 1; }
+  # 官方 zip 解压后是一个同名子目录（如 artex-0.7.0-linux-amd64/），需进入它
+  SUBDIR=""
+  for d in */; do
+    if [ -f "$d/start.sh" ] || [ -f "$d/artex" ]; then SUBDIR="${d%/}"; break; fi
+  done
+  if [ -n "$SUBDIR" ]; then
+    APP_DIR="$INSTALL_DIR/$SUBDIR"
+    echo "[+] 程序位于 $APP_DIR"
+  else
+    APP_DIR="$INSTALL_DIR"
+  fi
+  cd "$APP_DIR" || exit 1
   chmod +x artex start.sh 2>/dev/null
   if [ ! -f config.json ] && [ -f config.example.json ]; then
     cp config.example.json config.json
-    echo "[+] 已从 config.example.json 生成 config.json —— 请填入 database 段（host/user/password/dbname）"
+    echo "[+] 已生成 config.json —— 请填入 database 段（host/user/password/dbname）"
     echo "    没有现成 PostgreSQL 时，可先起一个："
     echo "    docker run -d --name artex-pg -p 5432:5432 -e POSTGRES_USER=artex -e POSTGRES_PASSWORD=<pw> -e POSTGRES_DB=artex -v artex-pg:/var/lib/postgresql/data postgres:16-alpine"
   fi
-  echo "==> 启动: cd $INSTALL_DIR && nohup ./start.sh >artex.log 2>&1 &"
+  echo "==> 启动（binary 模式的监听地址用 -addr 参数，不是 ARTEX_BIND_ADDR）:"
+  echo "    对外可访问: cd $APP_DIR && setsid nohup ./start.sh -addr 0.0.0.0:8787 > artex.log 2>&1 < /dev/null &"
+  echo "    仅本机:     cd $APP_DIR && setsid nohup ./start.sh > artex.log 2>&1 < /dev/null &"
   echo "    注意 start.sh 是守护脚本，不要直接运行 ./artex"
+  echo "APP_DIR=$APP_DIR"
 }
 
 case "$METHOD" in

@@ -84,14 +84,16 @@ echo "内存        : ${MEM_MB} MB (建议 >= ${MIN_MEM} MB)"
 echo "Swap        : ${SWAP_MB} MB"
 echo "根分区可用  : ${DISK_GB} GB (需 >= ${MIN_DISK} GB)"
 if [ "$MEM_MB" -gt 0 ] && [ "$MEM_MB" -lt "$MIN_MEM" ]; then
-  if [ "$APP" = "artex" ] && [ "$SWAP_MB" -ge 2048 ]; then
-    echo "  <== 内存不足；但有 ${SWAP_MB} MB swap，建议改用 release 预编译二进制路径（见 references/artex.md）"
-    WARN=1
-  elif [ "$SWAP_MB" -ge 2048 ]; then
-    echo "  <== 内存不足，有 swap 兜底；运行时可能 OOM，建议加物理内存"
+  # swap >= 1024 MB 即可作为兜底（2047/2048 这类边界很常见，别卡在这里）
+  if [ "$SWAP_MB" -ge 1024 ]; then
+    if [ "$APP" = "artex" ]; then
+      echo "  <== 内存不足；有 ${SWAP_MB} MB swap 兜底。建议改用 release 预编译二进制路径（见 references/artex.md）"
+    else
+      echo "  <== 内存不足；有 ${SWAP_MB} MB swap 兜底，但运行时可能 OOM，建议加物理内存"
+    fi
     WARN=1
   else
-    echo "  <== 内存不足且无 swap 兜底"
+    echo "  <== 内存不足且 swap 不足 1GB"
     FAIL=1
   fi
 fi
