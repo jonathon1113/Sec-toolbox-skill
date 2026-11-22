@@ -94,6 +94,36 @@ docker logs scope-sentry | grep -i 验证
 
 密码只输出一次，立刻保存。
 
+## 重置密码（官方没有重置命令）
+
+ScopeSentry **没有提供改密码的命令**，密码只在首次初始化时打印一次。两种办法：
+
+**办法一：改数据库（推荐，保留数据）**
+
+密码存的是 **sha256(明文)**（无 salt），用户名 `ScopeSentry`：
+
+```bash
+cd /opt/scopesentry
+MP=$(grep '^MONGO_INITDB_ROOT_PASSWORD=' .env | cut -d= -f2)
+NEWHASH=$(printf '%s' '你的新密码' | sha256sum | cut -d' ' -f1)
+docker exec scopesentry-mongodb mongo -u admin -p "$MP" --authenticationDatabase admin --quiet   --eval "db.getSiblingDB('ScopeSentry').user.update({username:'ScopeSentry'},{\$set:{password:'$NEWHASH'}})"
+```
+
+改完直接用新密码登录。
+
+**办法二：重建数据库（会清空所有资产/任务数据）**
+
+```bash
+cd /opt/scopesentry
+MP=$(grep '^MONGO_INITDB_ROOT_PASSWORD=' .env | cut -d= -f2)
+docker exec scopesentry-mongodb mongo -u admin -p "$MP" --authenticationDatabase admin --quiet   --eval "db.getSiblingDB('ScopeSentry').dropDatabase()"
+docker restart scope-sentry
+docker logs scope-sentry | grep -a 'User/Password'   # 会打印新的初始密码
+```
+
+> ⚠️ 官方密码**可能以 `/` 开头**（形如 `ScopeSentry//xxxx`），也可能含 `$ ( ) [ ]` 等特殊字符。
+> 复制时容易丢字符 —— 建议用上面的办法一改成一个简单的密码。
+
 ## 日常使用
 
 - Web UI：<http://<服务器IP>:8082/>

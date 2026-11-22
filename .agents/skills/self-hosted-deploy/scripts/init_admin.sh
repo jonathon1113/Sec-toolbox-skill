@@ -78,7 +78,18 @@ case "$APP" in
     echo "==> 取初始用户密码（仅本次输出，请立刻保存）："
     echo "    注意：数据库首次初始化时才打印，重启容器不会重复打印。"
     echo
-    docker logs "$C" 2>&1 | grep -aiE 'password|密码|passwd' | tail -6
+    # 官方输出形如: 🔑 User/Password: ScopeSentry/<password>
+    # 用 -o 精确截取整段，**不要丢任何字符**（密码可能以 / 开头，也可能含 $ ( ) [ ] 等特殊字符）
+    LINE="$(docker logs "$C" 2>&1 | grep -aoE 'User/Password: .*' | tail -1)"
+    if [ -n "$LINE" ]; then
+        echo "$LINE"
+        echo
+        echo "    ↑ 上面斜杠后面就是完整密码（可能以 / 开头，也可能含 \$ ( ) [ ] 等特殊字符，"
+        echo "      复制时不要漏字符；shell 里输入请用单引号包裹）。"
+    else
+        echo "[!] 日志里没有找到 User/Password 行（数据库已初始化就不会再打印）。"
+        echo "    重置办法见 references/scopesentry.md 的「重置密码」小节。"
+    fi
     ;;
 
   cyberstrike)
