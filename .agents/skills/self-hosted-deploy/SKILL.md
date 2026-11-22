@@ -68,16 +68,17 @@ docker compose logs -f        # 日志
 
 - compose 文件名不是默认名的项目（官方叫 `single-host-deployment.yml` 之类），
   安装时**建 `docker-compose.yml` 软链**，保证上面这套写法直接可用；
-- 上游没有容器方案的软件（只有源码构建，如 CyberStrikeAI）：先按官方方式构建好，
-  再用**自建 compose**（镜像基于官方构建产物）把它包起来，同样保证 `docker compose up -d` 可用；
+- **本约定只针对本来就是 Docker 部署的软件**。上游只提供源码构建、没有容器方案的软件
+  （如 CyberStrikeAI），按上游官方方式部署即可（systemd 托管），
+  **不要为了统一而自造 Dockerfile/compose** —— 那会偏离上游、也让升级路径分叉；
 - 交付说明里必须写清：**安装目录 + 启动命令 + 访问地址**。
 
-| 软件 | 安装目录 | 启动 |
+| 软件 | 安装目录 | 启动方式 |
 |---|---|---|
-| 雷池 SafeLine CE | `/data/safeline`（**官方固定路径**） | `cd /data/safeline && docker compose up -d` |
-| ARTEX | `/opt/artex` | `cd /opt/artex && docker compose up -d` |
-| CyberStrikeAI | `/opt/cyberstrike` | `cd /opt/cyberstrike && docker compose up -d`（compose 封装官方构建产物） |
-| ScopeSentry | `/opt/scopesentry` | `cd /opt/scopesentry && docker compose up -d` |
+| 雷池 SafeLine CE | `/data/safeline`（**官方固定路径**） | Docker：`cd /data/safeline && docker compose up -d` |
+| ARTEX | `/opt/artex` | Docker：`cd /opt/artex && docker compose up -d` |
+| ScopeSentry | `/opt/scopesentry` | Docker：`cd /opt/scopesentry && docker compose up -d` |
+| CyberStrikeAI | `/opt/cyberstrike` | 非 Docker（上游只有源码构建）：`systemctl start cyberstrike` |
 
 ## 第 1 步：前置检查（只读）
 

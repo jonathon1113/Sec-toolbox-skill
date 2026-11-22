@@ -77,8 +77,8 @@ docker compose logs -f   # 日志
   ```bash
   ln -sf "<官方 compose 文件名>" docker-compose.yml
   ```
-- 上游没有容器方案（只有源码构建）的软件：**先按官方方式构建好产物，再用自建 compose 包起来**
-  （镜像基于官方构建产物），保证用户面对的启动方式与其它软件一致；
+- **这条只针对本来就是 Docker 部署的软件**。上游只提供源码构建、没有容器方案的，
+  按上游官方方式部署（systemd 托管等），**不要自造 Dockerfile/compose** 去强行容器化；
 - 不要额外发明 `ctl.sh` 之类的自定义入口 —— 用户要的就是 `docker compose up -d`。
 
 ### 2. 重启策略规范化为 `unless-stopped`
