@@ -42,6 +42,7 @@ docker-compose -f single-host-deployment.yml up -d
 | 内存 | ≥ 2 GB 建议（4 个容器 + 扫描任务很吃内存） | 不足：加内存/swap，或不部署扫描节点 |
 | 磁盘 | ≥ 5 GB | 中止 |
 | GitHub 链路 | 下载 compose/.env 用 | 不通则加 `--proxy`（向用户询问代理地址） |
+| **CPU AVX** | **MongoDB 5.0+ 强制要求 AVX** | 无 AVX 的机器（QEMU 老 vCPU）上 `mongo:7.0.28` 会 `Illegal instruction`（退出码 132）反复崩溃。**安装脚本会自动检测并降级到 mongo:4.4**；根治办法是换支持 AVX 的 CPU/虚拟机型号 |
 
 > 扫描节点用 `network_mode: host`，会直接占用宿主机端口；机器上已有服务多时要注意。
 
@@ -56,6 +57,31 @@ REDIS_PASSWORD=<随机>
 ```
 
 `.env` 属于敏感文件（数据库密码），**不要提交到仓库**。
+
+## 低配 CPU 适配（无 AVX）
+
+官方 compose 用 `mongo:7.0.28`，而 **MongoDB 5.0+ 强制要求 CPU 支持 AVX**。在没有 AVX 的机器上
+（如 `QEMU Virtual CPU version 2.5+`），容器会：
+
+```
+WARNING: MongoDB 5.0+ requires a CPU with AVX support, and your current system does not appear to have that!
+/usr/local/bin/docker-entrypoint.sh: line 416: 26 Illegal instruction
+```
+
+表现为 `scopesentry-mongodb` 反复 `Restarting (132)`，然后 `scope-sentry` 因依赖不 healthy 起不来。
+
+**处理（安装脚本已自动完成）**：
+
+1. 检测无 AVX → compose 的 `image: mongo:7.0.28` 改为 `mongo:4.4`（不需要 AVX）；
+2. healthcheck 从 `mongosh` 换成**带认证**的 `mongo` 探活
+   （4.4 没有 `mongosh`；且开了认证后不带用户名密码的 ping 会失败）：
+
+```yaml
+test: ["CMD-SHELL", "mongo --quiet -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"db.runCommand({ping:1}).ok\" | grep -q 1"]
+```
+
+> 这是**降级方案**。换到支持 AVX 的机器（或虚拟机 CPU 型号换成带 AVX 的）后，可把 compose 改回 `mongo:7.0.28`，
+> 但要先清空 `data/mongodb/`（4.4 与 7.x 的数据格式不完全兼容）。
 
 ## 初始化凭据
 
@@ -94,6 +120,8 @@ docker-compose -f scan-docker-compose.yml up -d
 | `scope-sentry` 一直不 healthy | 依赖 mongo/redis healthy 才启动 | `docker compose ps` 看依赖；`docker compose logs mongodb redis` |
 | 拉镜像超时 | 上游污染/没配加速源 | 按 SKILL.md 第 2.5 步真实 pull 测速后配 `daemon.json` |
 | 容器起不来：端口冲突 | 8082 被占 | 改 compose 的 `ports` 映射，或先释放端口 |
+| `scopesentry-mongodb` 反复 Restarting (132) | CPU 无 AVX，MongoDB 5+ 崩溃 | 见上文「低配 CPU 适配」 |
+| `scope-sentry` 起不来，提示依赖 unhealthy | mongo/redis 没 healthy | 先看 `docker compose logs mongodb redis`；mongo 常见原因是无 AVX |
 | 扫描任务无结果 | 扫描节点异常 | `docker logs scopesentry-scan`；节点是 host 网络，注意与宿主端口冲突 |
 | 登录提示密码错误 | 用了旧的初始密码 | `docker logs scope-sentry | grep -i password` 取最新；数据库首次初始化后不会重复打印 |
 | 数据库连不上 | `.env` 密码改了但容器没重建 | `docker compose -f single-host-deployment.yml up -d --force-recreate` |

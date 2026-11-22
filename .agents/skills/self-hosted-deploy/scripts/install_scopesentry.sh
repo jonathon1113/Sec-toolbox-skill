@@ -111,6 +111,21 @@ else
   echo "[*] 复用 .env 中已有的 REDIS_PASSWORD"
 fi
 
+# ---------- 低配 CPU 适配（MongoDB 5+ 需要 AVX） ----------
+# 官方 compose 用 mongo:7.0.28，MongoDB 5.0+ 强制要求 CPU 支持 AVX；
+# 没有 AVX 的机器（如 QEMU 老 vCPU）会 Illegal instruction（退出码 132）反复崩溃。
+# 此时降级到 mongo:4.4（不需要 AVX），并把 healthcheck 换成带认证的 mongo shell 探活。
+AVX=1
+if command -v lscpu >/dev/null 2>&1; then
+  lscpu 2>/dev/null | grep -qw avx || AVX=0
+fi
+if [ "$AVX" = "0" ] && grep -q 'image: mongo:7' "$COMPOSE_FILE"; then
+  echo
+  echo "==> 检测到 CPU 不支持 AVX，MongoDB 5+ 会崩溃，改为 mongo:4.4"
+  bash "$(dirname "${BASH_SOURCE[0]}")/patch_mongo_legacy.sh" "$COMPOSE_FILE"
+  echo "    注意：mongo:4.4 是降级方案，换到支持 AVX 的机器后可改回 7.0.28"
+fi
+
 # ---------- 启动 ----------
 echo
 echo "==> 启动 4 个容器（mongodb / redis / scope-sentry / scopesentry-scan）"

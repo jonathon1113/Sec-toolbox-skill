@@ -142,9 +142,25 @@ case "$APP" in
     fi
     ;;
   scopesentry)
+    # MongoDB 5.0+ 强制要求 CPU 支持 AVX，无 AVX 时容器会以 SIGILL(退出码 132) 崩溃重启
+    if have lscpu; then
+      FLAGS="$(lscpu 2>/dev/null)"
+      if echo "$FLAGS" | grep -qw avx; then
+        echo "CPU avx     : 支持（MongoDB 5+ 可用）"
+      else
+        echo "CPU avx     : 不支持  <== 官方 compose 的 mongo:7.0.28 需要 AVX，会 Illegal instruction 崩溃"
+        echo "             方案：① 换支持 AVX 的 CPU/虚拟机型号（推荐）"
+        echo "                   ② 降级到 mongo:4.4（安装脚本会自动处理）"
+        WARN=1
+      fi
+    fi
     if have docker; then
       echo "Docker      : $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo '已安装(daemon未探活)')"
-      docker compose version >/dev/null 2>&1 && echo "Compose     : $(docker compose version --short 2>/dev/null) 可用"         || echo "Compose     : 缺失  <== ScopeSentry 部署需要 Compose v2"; FAIL=1
+      if docker compose version >/dev/null 2>&1; then
+        echo "Compose     : $(docker compose version --short 2>/dev/null) 可用"
+      else
+        echo "Compose     : 缺失  <== ScopeSentry 部署需要 Compose v2"; FAIL=1
+      fi
     else
       echo "Docker      : 缺失  <== ScopeSentry 是 Docker Compose 部署，请先执行 linux-docker-env/scripts/install_docker.sh"; FAIL=1
     fi
