@@ -118,6 +118,15 @@ bash scripts/verify.sh --app safeline
 - 提醒下一步「添加应用」把站点反代进来
 - 常用运维命令（见 `references/运维速查.md`）
 
+## 重启策略
+
+官方 compose 用 `restart: always` —— **手动 stop 后机器重启仍会被拉起**。
+本 skill 安装脚本会自动规范化为 `unless-stopped`（手动 stop 的不再开机自启，崩溃/daemon 重启仍自动恢复）。
+
+```bash
+bash scripts/set_restart_policy.sh --compose /data/safeline/docker-compose.yaml
+```
+
 ## 已知环境坑（实测）
 
 | 环境 | 问题 | 处理 |

@@ -65,3 +65,11 @@ fi
 
 echo
 echo "[OK] 雷池安装完成。接着运行 init_admin.sh 与 verify.sh。"
+
+# 重启策略规范化：官方 compose 用 restart: always（手动 stop 后开机仍会被拉起），
+# 改成 unless-stopped —— 手动 stop 的不再开机自启，崩溃/daemon 重启仍自动恢复。
+if [ -f /data/safeline/docker-compose.yaml ]; then
+  echo
+  echo "==> 规范化重启策略为 unless-stopped"
+  bash "$SCRIPT_DIR/set_restart_policy.sh" --compose /data/safeline/docker-compose.yaml || true
+fi

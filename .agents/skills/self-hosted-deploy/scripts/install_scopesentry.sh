@@ -161,3 +161,9 @@ echo "==> 下一步："
 echo "    1) Web UI: http://<服务器IP>:8082/"
 echo "    2) 插件二次验证密码: docker logs scope-sentry | grep -i 验证"
 echo "    3) 自检:   bash scripts/verify.sh --app scopesentry"
+
+# 重启策略规范化：官方 compose 用 restart: always（手动 stop 后开机仍会被拉起），
+# 改成 unless-stopped —— 手动 stop 的不再开机自启，崩溃/daemon 重启仍自动恢复。
+echo
+echo "==> 规范化重启策略为 unless-stopped"
+bash "$(dirname "${BASH_SOURCE[0]}")/set_restart_policy.sh" --compose "$INSTALL_DIR/$COMPOSE_FILE" || true

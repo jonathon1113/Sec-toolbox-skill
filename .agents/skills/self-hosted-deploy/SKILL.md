@@ -109,6 +109,17 @@ bash scripts/verify.sh --app <app>
 
 独立判断成功/失败，输出人类可读报告 + `KEY=VALUE` 机器可读段。
 
+## 第 5.5 步：重启策略规范化（Docker 部署必做）
+
+Docker 官方 compose 常用 `restart: always`，会导致**手动 stop 的容器在机器重启后仍被拉起**。
+本 skill 的统一约定是 **`unless-stopped`**：手动 stop 的保持停止，崩溃/daemon 重启仍自动恢复。
+
+```bash
+bash scripts/set_restart_policy.sh --compose <该软件的 compose 文件>
+```
+
+安装脚本已自动执行这一步；交付前确认一次即可。
+
 ## 第 6 步：交付说明
 
 给出：访问地址、账号、密码（一次性）、容器/服务状态、后续建议（改默认密码、加固、加内存等）。

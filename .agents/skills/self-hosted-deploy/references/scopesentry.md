@@ -124,6 +124,15 @@ docker logs scope-sentry | grep -a 'User/Password'   # 会打印新的初始密�
 > ⚠️ 官方密码**可能以 `/` 开头**（形如 `ScopeSentry//xxxx`），也可能含 `$ ( ) [ ]` 等特殊字符。
 > 复制时容易丢字符 —— 建议用上面的办法一改成一个简单的密码。
 
+## 重启策略
+
+官方 compose 用 `restart: always` —— 手动 stop 后机器重启仍会被拉起。
+本 skill 安装脚本会自动规范化为 `unless-stopped`。
+
+```bash
+bash scripts/set_restart_policy.sh --compose /opt/scopesentry/single-host-deployment.yml
+```
+
 ## 日常使用
 
 - Web UI：<http://<服务器IP>:8082/>

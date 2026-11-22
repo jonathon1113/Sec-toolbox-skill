@@ -126,7 +126,10 @@ install_compose() {
   fi
 
   echo
-  echo "==> 启动完成。取一次性 setup token："
+  
+  # 重启策略规范化（官方 compose 已是 unless-stopped，这里统一保证）
+  bash "$(dirname "${BASH_SOURCE[0]}")/set_restart_policy.sh" --compose "$INSTALL_DIR/docker-compose.yml" 2>/dev/null || true
+echo "==> 启动完成。取一次性 setup token："
   docker compose logs artex 2>/dev/null | grep -i "setup token" | tail -3
   echo
   echo "==> 浏览器打开 http://<服务器IP>:$( [ "$BIND_ADDR" = "127.0.0.1" ] && echo 8787 || echo 8787 )/setup 输入上面的 token 完成首次认领"
