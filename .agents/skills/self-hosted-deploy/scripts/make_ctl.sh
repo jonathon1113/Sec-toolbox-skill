@@ -17,9 +17,10 @@ ARG="${4:-}"
 
 if [ "$MODE" = "compose" ]; then
   COMPOSE="${ARG:-docker-compose.yml}"
+  # 绝对路径原样使用；相对路径挂到安装目录下
   case "$COMPOSE" in
-    /*) : ;;                       # 绝对路径：compose 文件在别处（如雷池的 /data/safeline）
-    *) COMPOSE="$COMPOSE" ;;
+    /*) COMPOSE_PATH="$COMPOSE" ;;
+    *)  COMPOSE_PATH="\$DIR/$COMPOSE" ;;
   esac
   cat > "$DIR/ctl.sh" <<EOF
 #!/usr/bin/env bash
@@ -27,7 +28,7 @@ if [ "$MODE" = "compose" ]; then
 # 用法: ./ctl.sh {start|stop|down|restart|status|logs|update}
 set -uo pipefail
 DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE="\$DIR/${COMPOSE}"
+COMPOSE="${COMPOSE_PATH}"
 cd "\$DIR" || exit 1
 case "\${1:-status}" in
   start)   docker compose -f "\$COMPOSE" up -d ;;
