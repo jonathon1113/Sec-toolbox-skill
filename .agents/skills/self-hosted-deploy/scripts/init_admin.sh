@@ -14,7 +14,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$APP" ]; then
-  echo "用法: bash init_admin.sh --app <safeline|artex|cyberstrike|scopesentry>"
+  echo "用法: bash init_admin.sh --app <safeline|artex|cyberstrike|scopesentry|arl-plus>"
   exit 1
 fi
 
@@ -70,6 +70,17 @@ case "$APP" in
     fi
     ;;
 
+  arl-plus)
+    echo "==> ARL-plus 的账号由官方 mongo-init.js 初始化（固定默认密码，非随机生成）"
+    echo "    Web UI : https://<服务器IP>:5003/   (HTTPS 自签证书)"
+    echo "    账号   : admin"
+    echo "    密码   : arlpass"
+    echo
+    echo "    ⚠ 这是 ARL 官方公开的默认密码，**登录后请立刻在「系统设置 → 用户管理」修改**。"
+    echo "    重置方法（清库重建）："
+    echo "      cd /opt/arl-plus && docker compose down -v && docker compose up -d"
+    ;;
+
   scopesentry)
     C="$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -x 'scope-sentry' | head -1)"
     if [ -z "$C" ]; then
@@ -111,5 +122,5 @@ case "$APP" in
     ;;
 
   *)
-    echo "[X] 未知 --app: $APP（可选 safeline | artex | cyberstrike | scopesentry）"; exit 1 ;;
+    echo "[X] 未知 --app: $APP（可选 safeline | artex | cyberstrike | scopesentry | arl-plus）"; exit 1 ;;
 esac

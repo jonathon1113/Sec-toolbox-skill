@@ -27,6 +27,7 @@ case "$APP" in
   artex)    echo " ARTEX 自检" ;;
   cyberstrike) echo " CyberStrikeAI 自检" ;;
   scopesentry) echo " ScopeSentry 自检" ;;
+  arl-plus) echo " ARL-plus 自检" ;;
   *) echo "[X] 未知 --app: $APP"; exit 1 ;;
 esac
 echo "=========================================="
@@ -44,6 +45,15 @@ if have docker && docker info >/dev/null 2>&1; then
       else
         echo "  运行中: $RUNNING / 共 $TOTAL"
       fi
+      ;;
+    arl-plus)
+      for c in arl_web arl_worker arl_scheduler arl_mongodb arl_rabbitmq; do
+        if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$c"; then
+          echo "  $c: 运行中"
+        else
+          echo "  <== $c 未运行"; FAIL=1
+        fi
+      done
       ;;
     scopesentry)
       docker ps -a --filter "name=scopesentry" --filter "name=scope-sentry" --format '{{.Names}}	{{.Status}}' 2>/dev/null | sed 's/^/  /'
@@ -99,6 +109,7 @@ case "$APP" in
   artex)    PORT=8787 ;;
   cyberstrike) PORT=8080 ;;
   scopesentry) PORT=8082 ;;
+  arl-plus) PORT=5003 ;;
 esac
 if have ss; then
   if ss -lnt 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${PORT}\$"; then
@@ -117,6 +128,7 @@ case "$APP" in
   artex)    URL="http://127.0.0.1:${PORT}/" ;;
   cyberstrike) URL="https://127.0.0.1:${PORT}/" ;;
   scopesentry) URL="http://127.0.0.1:${PORT}/" ;;
+  arl-plus) URL="https://127.0.0.1:${PORT}/" ;;
 esac
 if have curl; then
   CODE="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 15 "$URL" 2>/dev/null)"
@@ -138,6 +150,19 @@ case "$APP" in
       ls /data/safeline 2>/dev/null | sed 's/^/    /' | head -6
     else
       echo "  <== /data/safeline 不存在"; FAIL=1
+    fi
+    ;;
+  arl-plus)
+    ADIR="${ARL_DIR:-/opt/arl-plus}"
+    if [ -d "$ADIR" ]; then
+      echo "  安装目录: $ADIR"
+      for f in docker-compose.yml config-docker.yaml mongo-init.js; do
+        [ -f "$ADIR/$f" ] && echo "    $f 存在" || echo "    <== $f 缺失"
+      done
+      [ -f "$ADIR/arl_web.log" ] && echo "    arl_web.log 存在" || echo "    <== arl_web.log 缺失（bind-mount 需为文件）"
+      docker volume inspect arl_db >/dev/null 2>&1 && echo "    外部卷 arl_db 存在" || echo "    <== 外部卷 arl_db 缺失（docker volume create arl_db）"
+    else
+      echo "  未找到 $ADIR 安装目录"
     fi
     ;;
   scopesentry)
@@ -213,6 +238,7 @@ if [ "$FAIL" = "0" ]; then
     artex)    echo "Web UI: http://<服务器IP>:${PORT}/  （首次访问 /setup 用 setup token 认领）" ;;
     cyberstrike) echo "Web UI: https://<服务器IP>:${PORT}/  （自签证书，首次需接受告警；http:// 会 308 跳 https）" ;;
     scopesentry) echo "Web UI: http://<服务器IP>:${PORT}/" ;;
+    arl-plus) echo "Web UI: https://<服务器IP>:${PORT}/  （自签证书；默认账号 admin / arlpass，请尽快改密码）" ;;
   esac
   exit 0
 else

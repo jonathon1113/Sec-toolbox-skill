@@ -30,6 +30,13 @@ case "$APP" in
     MIN_MEM=2048
     MIN_DISK=5
     ;;
+  arl-plus)
+    TITLE="ARL-plus (资产侦察与漏洞扫描平台)"
+    PORTS="5003"
+    PORT_DESC="ARL-plus Web UI 默认端口"
+    MIN_MEM=4096
+    MIN_DISK=5
+    ;;
   scopesentry)
     TITLE="ScopeSentry ( cyberspace 测绘 / 扫描平台)"
     PORTS="8082"
@@ -139,6 +146,22 @@ case "$APP" in
       echo "检测到已有雷池容器："
       docker ps -a --filter "name=safeline" --format '  {{.Names}}\t{{.Status}}' 2>/dev/null
       echo "  <== 已安装过，如需重装请先与用户确认"
+    fi
+    ;;
+  arl-plus)
+    if have docker; then
+      echo "Docker      : $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo '已安装(daemon未探活)')"
+      if docker compose version >/dev/null 2>&1; then
+        echo "Compose     : $(docker compose version --short 2>/dev/null) 可用"
+      else
+        echo "Compose     : 缺失  <== ARL-plus 需要 Compose v2"; FAIL=1
+      fi
+    else
+      echo "Docker      : 缺失  <== ARL-plus 是 Docker Compose 部署"; FAIL=1
+    fi
+    if have curl; then echo "curl        : 已安装"; else echo "curl        : 缺失  <== 下载官方文件需要"; FAIL=1; fi
+    if [ -d /opt/arl-plus ]; then
+      echo "检测到已有 /opt/arl-plus 目录  <== 可能已安装过，重装前先与用户确认"
     fi
     ;;
   scopesentry)
