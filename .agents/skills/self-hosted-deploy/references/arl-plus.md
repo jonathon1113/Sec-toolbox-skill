@@ -71,6 +71,32 @@ GEOIP:
 - FOFA / hunter / quake / zoomeye 等 API key 默认留空，对应插件不可用
 - `center_option` 默认 false（不向中心节点上传数据），要联网上报需改 true 并重启
 
+## 拉不动大镜像时的正确做法（实测）
+
+ARL 的 `ki9mu/arl-ki9mu` 有 1.69GB，在部分机器上**仅靠加速源拉不动**（某一层反复 `Retrying`）。
+
+按顺序处理：
+
+1. **加多个加速源**，让 Docker 自动 fallback（实测有效）：
+   ```json
+   { "registry-mirrors": ["https://docker.m.daocloud.io", "https://docker.1panel.live",
+                         "https://dockerproxy.net", "https://docker.1ms.run", "https://hub.rat.dev"] }
+   ```
+   `systemctl restart docker` 后再 pull（daemon 不热加载）。
+
+2. **给 dockerd 配代理**（源也不稳时的杀手锏，实测在 CentOS 7 上一次拉通）：
+   ```json
+   { "proxies": { "http-proxy": "http://<host:port>", "https-proxy": "http://<host:port>",
+                  "no-proxy": "localhost,127.0.0.1,192.168.0.0/16,172.16.0.0/12" } }
+   ```
+   `systemctl restart docker` 后 `docker info | grep -i proxy` 能看到即生效。
+   代理地址由用户提供，**不写进本 skill**。
+
+3. **拉完再重跑安装脚本**即可完成部署（幂等）。
+
+> 注意：给 dockerd 配代理后，**所有** docker 拉取都会走代理；
+> `no-proxy` 务必带上内网段，避免容器访问宿主机/内网服务被绕进代理。
+
 ## 日常使用
 
 ```bash
@@ -103,3 +129,4 @@ docker compose logs -f arl_web
 | 拉镜像很慢 / 拉不完 | Docker Hub 链路问题，ARL 镜像有 1.69GB | 按 SKILL.md 第 2.5 步真实 pull 测速后配镜像加速源 |
 | `ki9mu/arl-ki9mu` 拉了 15 分钟还没完 | 加速源只有 2 个且都不通该镜像的大层 | **补多个加速源让 Docker 自动 fallback**（实测有效）：`daocloud` + `1panel` + `dockerproxy.net` + `docker.1ms.run` + `hub.rat.dev`，改完 `systemctl restart docker` 再 pull |
 | 某个镜像拉失败导致整体装不上 | —— | 脚本会跳过失败镜像继续拉其余的；**镜像补齐后直接重跑安装脚本**即可（幂等：复用已有文件、外部卷、镜像） |
+| 同一层反复 `Retrying in 2 seconds` | 该层在所有加速源上都不稳 | **给 dockerd 配代理**（最有效）：`/etc/docker/daemon.json` 加 `proxies` 段后 `systemctl restart docker`，再 pull；见下 |
