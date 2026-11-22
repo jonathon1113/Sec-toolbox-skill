@@ -129,6 +129,9 @@ install_compose() {
   
   # 重启策略规范化（官方 compose 已是 unless-stopped，这里统一保证）
   bash "$(dirname "${BASH_SOURCE[0]}")/set_restart_policy.sh" --compose "$INSTALL_DIR/docker-compose.yml" 2>/dev/null || true
+
+  # 生成统一启停入口: <安装目录>/ctl.sh
+  bash "$(dirname "${BASH_SOURCE[0]}")/make_ctl.sh" compose ARTEX "$INSTALL_DIR" docker-compose.yml 2>/dev/null || true
 echo "==> 启动完成。取一次性 setup token："
   docker compose logs artex 2>/dev/null | grep -i "setup token" | tail -3
   echo

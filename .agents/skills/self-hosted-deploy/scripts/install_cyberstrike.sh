@@ -206,6 +206,9 @@ UNIT
 fi
 
 echo
+
+# 生成统一启停入口: <安装目录>/ctl.sh
+bash "$(dirname "${BASH_SOURCE[0]}")/make_ctl.sh" systemd CyberStrikeAI "$INSTALL_DIR" cyberstrike 2>/dev/null || true
 echo "==> 下一步："
 echo "    1) 取 admin 密码: bash scripts/init_admin.sh --app cyberstrike"
 echo "    2) 自检:          bash scripts/verify.sh --app cyberstrike"

@@ -53,6 +53,27 @@ metadata:
 
 **Docker 优先 ≠ 每次从零构建。** 需要部署到多台机器时，构建产物要复用：首次构建后 `docker save` 导出镜像，目标机 `docker load` 导入后直接 `up -d`（用私有 registry 则 `pull`），不要每台机器重跑一遍构建。构建耗时较长时（> 10 分钟）尤其要这么做。
 
+## 安装目录与统一入口（约定）
+
+**所有软件默认安装在 `/opt/<软件名>/` 下**，每个安装目录里都生成一个统一的启停入口 `ctl.sh`：
+
+```bash
+cd /opt/<软件名>
+./ctl.sh start | stop | down | restart | status | logs | update
+```
+
+- `stop` = 停止但保留容器与数据（配合 `unless-stopped`，手动停止后开机不会自启）
+- `down` = 停止并删除容器（保留数据卷）
+
+| 软件 | 安装目录 | 入口 |
+|---|---|---|
+| 雷池 SafeLine CE | `/data/safeline`（**官方固定路径，不能改**） | `/opt/safeline/ctl.sh`（转发到官方目录） |
+| ARTEX | `/opt/artex` | `/opt/artex/ctl.sh` |
+| CyberStrikeAI | `/opt/cyberstrike` | `/opt/cyberstrike/ctl.sh`（systemd） |
+| ScopeSentry | `/opt/scopesentry` | `/opt/scopesentry/ctl.sh` |
+
+交付说明里必须写清：**安装目录 + 入口脚本 + 访问地址**。
+
 ## 第 1 步：前置检查（只读）
 
 ```bash

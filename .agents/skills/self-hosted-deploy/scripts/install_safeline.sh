@@ -73,3 +73,24 @@ if [ -f /data/safeline/docker-compose.yaml ]; then
   echo "==> 规范化重启策略为 unless-stopped"
   bash "$SCRIPT_DIR/set_restart_policy.sh" --compose /data/safeline/docker-compose.yaml || true
 fi
+
+# 生成统一启停入口（雷池官方目录固定为 /data/safeline，这里在 /opt/safeline 放一个转发入口）
+mkdir -p /opt/safeline
+cat > /opt/safeline/ctl.sh <<CTLEOF
+#!/usr/bin/env bash
+# ctl.sh - 雷池 SafeLine CE 统一管理入口（实际安装目录 /data/safeline）
+set -uo pipefail
+D=/data/safeline
+cd "$D" || exit 1
+case "${1:-status}" in
+  start)   docker compose -f "$D/docker-compose.yaml" up -d ;;
+  stop)    echo "[i] 停止服务（保留容器与数据）"; docker compose -f "$D/docker-compose.yaml" stop ;;
+  down)    echo "[i] 停止并删除容器（保留数据）"; docker compose -f "$D/docker-compose.yaml" down ;;
+  restart) docker compose -f "$D/docker-compose.yaml" restart ;;
+  status)  docker compose -f "$D/docker-compose.yaml" ps ;;
+  logs)    docker compose -f "$D/docker-compose.yaml" logs -f ;;
+  *) echo "用法: ./ctl.sh {start|stop|down|restart|status|logs}"; exit 1 ;;
+esac
+CTLEOF
+chmod +x /opt/safeline/ctl.sh
+echo "[+] 已生成 /opt/safeline/ctl.sh（实际数据在 /data/safeline）"
