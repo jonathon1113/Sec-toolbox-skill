@@ -211,8 +211,6 @@ echo
 # systemd 会记住 systemctl stop 的状态，机器重启后不会自动拉起；崩溃退出则由 Restart=always 恢复。
 # 因此这里不需要 set_restart_policy.sh（那是给 Docker 容器用的）。
 
-# 生成统一启停入口: <安装目录>/ctl.sh
-bash "$(dirname "${BASH_SOURCE[0]}")/make_ctl.sh" systemd CyberStrikeAI "$INSTALL_DIR" cyberstrike 2>/dev/null || true
 echo "==> 下一步："
 echo "    1) 取 admin 密码: bash scripts/init_admin.sh --app cyberstrike"
 echo "    2) 自检:          bash scripts/verify.sh --app cyberstrike"

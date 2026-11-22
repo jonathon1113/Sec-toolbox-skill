@@ -60,21 +60,26 @@ metadata:
 
 ## 每个新软件都必须具备的两件事
 
-### 1. 统一启停入口 `ctl.sh`
+### 1. 必须能用标准 compose 命令启动
 
-安装目录（默认 `/opt/<app>/`）里生成 `ctl.sh`，提供
-`start / stop / down / restart / status / logs / update`：
+安装目录（默认 `/opt/<app>/`）里，用户**进入目录就能用标准命令管理**：
 
 ```bash
-# install_<app>.sh 末尾调用
-bash "$(dirname "${BASH_SOURCE[0]}")/make_ctl.sh" compose "<软件名>" "$INSTALL_DIR" "<compose 文件名>"
-bash "$(dirname "${BASH_SOURCE[0]}")/make_ctl.sh" systemd "<软件名>" "$INSTALL_DIR" "<systemd 服务名>"
+cd /opt/<app>
+docker compose up -d     # 启动
+docker compose ps        # 状态
+docker compose stop      # 停止（保留容器与数据）
+docker compose down      # 停止并删容器
+docker compose logs -f   # 日志
 ```
 
-- compose 型的 `ctl.sh` 里 `stop` 用 `docker compose stop`（**保留容器与数据**），`down` 才删容器；
-- compose 文件名不是默认名时，另外建 `docker-compose.yml` 软链，让
-  `cd <安装目录> && docker compose up -d` 直接可用；
-- systemd 型（源码构建、无容器方案的软件）的 `ctl.sh` 转 `systemctl` / `journalctl`。
+- compose 文件名不是默认名时，安装时建 `docker-compose.yml` 软链：
+  ```bash
+  ln -sf "<官方 compose 文件名>" docker-compose.yml
+  ```
+- 上游没有容器方案（只有源码构建）的软件：**先按官方方式构建好产物，再用自建 compose 包起来**
+  （镜像基于官方构建产物），保证用户面对的启动方式与其它软件一致；
+- 不要额外发明 `ctl.sh` 之类的自定义入口 —— 用户要的就是 `docker compose up -d`。
 
 ### 2. 重启策略规范化为 `unless-stopped`
 
@@ -185,7 +190,7 @@ bash scripts/verify.sh --app <app>
 - [ ] `precheck.sh` 不改动任何系统状态
 - [ ] `verify.sh` 能独立判断成功/失败
 - [ ] 多软件：每个 app 都有 `references/<app>.md` + `install_<app>.sh` + 三处 `--app` 分支
-- [ ] **每个 app 的安装目录里有 `ctl.sh`**（统一启停入口），且 install 脚本会生成它
+- [ ] **每个 app 都能 `cd <安装目录> && docker compose up -d` 启动**（非默认 compose 文件名的要建软链）
 - [ ] **Docker 部署的 app：restart 策略已是 `unless-stopped`**（手动 stop 后开机不自启）
 - [ ] 安装目录在 `/opt/<app>/`（上游官方固定路径的除外，需提供 `/opt/<app>/ctl.sh` 转发入口）
 - [ ] 故障排查文档覆盖：拉镜像失败、端口冲突、忘记密码、访问不通

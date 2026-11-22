@@ -53,40 +53,31 @@ metadata:
 
 **Docker 优先 ≠ 每次从零构建。** 需要部署到多台机器时，构建产物要复用：首次构建后 `docker save` 导出镜像，目标机 `docker load` 导入后直接 `up -d`（用私有 registry 则 `pull`），不要每台机器重跑一遍构建。构建耗时较长时（> 10 分钟）尤其要这么做。
 
-## 安装目录与统一入口（约定）
+## 安装目录与启动方式（约定）
 
-**所有软件默认安装在 `/opt/<软件名>/` 下**，每个安装目录里都生成一个统一的启停入口 `ctl.sh`：
-
-```bash
-cd /opt/<软件名>
-./ctl.sh start | stop | down | restart | status | logs | update
-```
-
-- `stop` = 停止但保留容器与数据（配合 `unless-stopped`，手动停止后开机不会自启）
-- `down` = 停止并删除容器（保留数据卷）
-
-**`ctl.sh` 只是省记忆，不是必须的**。凡是 compose 部署的，直接用标准命令即可：
+**所有软件默认安装在 `/opt/<软件名>/` 下**，并且**必须能用标准 compose 命令直接启动**：
 
 ```bash
 cd /opt/<软件名>
 docker compose up -d          # 启动
 docker compose ps             # 状态
-docker compose stop           # 停止（保留容器与数据）
-docker compose down           # 停止并删容器
+docker compose stop           # 停止（保留容器与数据；手动停止后开机不会自启）
+docker compose down           # 停止并删容器（保留数据卷）
 docker compose logs -f        # 日志
 ```
 
-安装脚本会为官方 compose 文件名不是默认名的项目（如 ScopeSentry 的 `single-host-deployment.yml`）
-创建 `docker-compose.yml` 软链，保证上面的写法直接可用。
+- compose 文件名不是默认名的项目（官方叫 `single-host-deployment.yml` 之类），
+  安装时**建 `docker-compose.yml` 软链**，保证上面这套写法直接可用；
+- 上游没有容器方案的软件（只有源码构建，如 CyberStrikeAI）：先按官方方式构建好，
+  再用**自建 compose**（镜像基于官方构建产物）把它包起来，同样保证 `docker compose up -d` 可用；
+- 交付说明里必须写清：**安装目录 + 启动命令 + 访问地址**。
 
-| 软件 | 安装目录 | 入口 |
+| 软件 | 安装目录 | 启动 |
 |---|---|---|
-| 雷池 SafeLine CE | `/data/safeline`（**官方固定路径，不能改**） | `/opt/safeline/ctl.sh`（转发到官方目录） |
-| ARTEX | `/opt/artex` | `/opt/artex/ctl.sh` |
-| CyberStrikeAI | `/opt/cyberstrike` | `/opt/cyberstrike/ctl.sh`（systemd） |
-| ScopeSentry | `/opt/scopesentry` | `/opt/scopesentry/ctl.sh` |
-
-交付说明里必须写清：**安装目录 + 入口脚本 + 访问地址**。
+| 雷池 SafeLine CE | `/data/safeline`（**官方固定路径**） | `cd /data/safeline && docker compose up -d` |
+| ARTEX | `/opt/artex` | `cd /opt/artex && docker compose up -d` |
+| CyberStrikeAI | `/opt/cyberstrike` | `cd /opt/cyberstrike && docker compose up -d`（compose 封装官方构建产物） |
+| ScopeSentry | `/opt/scopesentry` | `cd /opt/scopesentry && docker compose up -d` |
 
 ## 第 1 步：前置检查（只读）
 

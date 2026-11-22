@@ -74,7 +74,4 @@ if [ -f /data/safeline/docker-compose.yaml ]; then
   bash "$SCRIPT_DIR/set_restart_policy.sh" --compose /data/safeline/docker-compose.yaml || true
 fi
 
-# 生成统一启停入口（雷池官方目录固定为 /data/safeline，这里在 /opt/safeline 放一个转发入口）
-mkdir -p /opt/safeline
-bash "$SCRIPT_DIR/make_ctl.sh" compose "雷池 SafeLine CE" /opt/safeline /data/safeline/docker-compose.yaml
 

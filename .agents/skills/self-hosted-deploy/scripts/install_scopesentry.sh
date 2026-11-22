@@ -169,8 +169,6 @@ if [ "$COMPOSE_FILE" != "docker-compose.yml" ]; then
   echo "[+] 已创建软链 docker-compose.yml -> $COMPOSE_FILE（可直接用 docker compose up -d）"
 fi
 
-# 生成统一启停入口: /opt/scopesentry/ctl.sh
-bash "$(dirname "${BASH_SOURCE[0]}")/make_ctl.sh" compose ScopeSentry "$INSTALL_DIR" "$COMPOSE_FILE"
 
 # 重启策略规范化：官方 compose 用 restart: always（手动 stop 后开机仍会被拉起），
 # 改成 unless-stopped —— 手动 stop 的不再开机自启，崩溃/daemon 重启仍自动恢复。
