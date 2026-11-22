@@ -133,6 +133,22 @@ docker logs scope-sentry | grep -a 'User/Password'   # 会打印新的初始密�
 bash scripts/set_restart_policy.sh --compose /opt/scopesentry/single-host-deployment.yml
 ```
 
+## 启动与停止
+
+官方 compose 文件名是 `single-host-deployment.yml`（不是默认名），安装脚本已建好软链，
+所以标准命令直接可用：
+
+```bash
+cd /opt/scopesentry
+docker compose up -d       # 启动
+docker compose ps          # 状态
+docker compose stop        # 停止（保留容器与数据）
+docker compose down        # 停止并删容器
+docker compose logs -f     # 日志
+```
+
+也可以用统一入口：`./ctl.sh start|stop|status|logs`（等价，省记 compose 文件名）。
+
 ## 日常使用
 
 - Web UI：<http://<服务器IP>:8082/>

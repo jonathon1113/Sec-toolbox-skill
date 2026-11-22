@@ -162,6 +162,13 @@ echo "    1) Web UI: http://<服务器IP>:8082/"
 echo "    2) 插件二次验证密码: docker logs scope-sentry | grep -i 验证"
 echo "    3) 自检:   bash scripts/verify.sh --app scopesentry"
 
+# 建默认名软链，让 `cd /opt/scopesentry && docker compose up -d` 直接可用
+# （官方 compose 文件名是 single-host-deployment.yml，不是默认名）
+if [ "$COMPOSE_FILE" != "docker-compose.yml" ]; then
+  ln -sf "$COMPOSE_FILE" docker-compose.yml
+  echo "[+] 已创建软链 docker-compose.yml -> $COMPOSE_FILE（可直接用 docker compose up -d）"
+fi
+
 # 生成统一启停入口: /opt/scopesentry/ctl.sh
 bash "$(dirname "${BASH_SOURCE[0]}")/make_ctl.sh" compose ScopeSentry "$INSTALL_DIR" "$COMPOSE_FILE"
 

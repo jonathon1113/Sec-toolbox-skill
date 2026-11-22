@@ -65,6 +65,20 @@ cd /opt/<软件名>
 - `stop` = 停止但保留容器与数据（配合 `unless-stopped`，手动停止后开机不会自启）
 - `down` = 停止并删除容器（保留数据卷）
 
+**`ctl.sh` 只是省记忆，不是必须的**。凡是 compose 部署的，直接用标准命令即可：
+
+```bash
+cd /opt/<软件名>
+docker compose up -d          # 启动
+docker compose ps             # 状态
+docker compose stop           # 停止（保留容器与数据）
+docker compose down           # 停止并删容器
+docker compose logs -f        # 日志
+```
+
+安装脚本会为官方 compose 文件名不是默认名的项目（如 ScopeSentry 的 `single-host-deployment.yml`）
+创建 `docker-compose.yml` 软链，保证上面的写法直接可用。
+
 | 软件 | 安装目录 | 入口 |
 |---|---|---|
 | 雷池 SafeLine CE | `/data/safeline`（**官方固定路径，不能改**） | `/opt/safeline/ctl.sh`（转发到官方目录） |
