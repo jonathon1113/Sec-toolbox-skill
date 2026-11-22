@@ -47,13 +47,20 @@ if have docker && docker info >/dev/null 2>&1; then
       ;;
     scopesentry)
       docker ps -a --filter "name=scopesentry" --filter "name=scope-sentry" --format '{{.Names}}	{{.Status}}' 2>/dev/null | sed 's/^/  /'
-      for c in scopesentry-mongodb scopesentry-redis scope-sentry scopesentry-scan; do
+      # 核心三件套是必须的；扫描节点是**可选**的（官方允许单独部署更多节点）
+      for c in scopesentry-mongodb scopesentry-redis scope-sentry; do
         if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$c"; then
           echo "  $c: 运行中"
         else
-          echo "  <== $c 未运行"; FAIL=1
+          echo "  <== $c 未运行（核心服务）"; FAIL=1
         fi
       done
+      if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "scopesentry-scan"; then
+        echo "  scopesentry-scan: 运行中（可选扫描节点）"
+      else
+        echo "  [!] scopesentry-scan 未运行（可选扫描节点，不影响 Web UI；"
+        echo "      需要时: cd /opt/scopesentry && docker compose up -d scopesentry-scan）"
+      fi
       ;;
     cyberstrike)
       if pgrep -f 'cyberstrike-ai' >/dev/null 2>&1; then

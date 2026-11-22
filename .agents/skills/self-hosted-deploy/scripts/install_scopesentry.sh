@@ -127,10 +127,36 @@ if [ "$AVX" = "0" ] && grep -q 'image: mongo:7' "$COMPOSE_FILE"; then
 fi
 
 # ---------- 启动 ----------
+# 建默认名软链，让 `cd /opt/scopesentry && docker compose up -d` 直接可用
+# （官方 compose 文件名是 single-host-deployment.yml，不是默认名）
+# 注意：必须在 up 之前建 —— 否则拉镜像卡住/中断时，命令会停在 up 上，后续步骤都执行不到。
+if [ "$COMPOSE_FILE" != "docker-compose.yml" ]; then
+  ln -sf "$COMPOSE_FILE" docker-compose.yml
+  echo "[+] 已创建软链 docker-compose.yml -> $COMPOSE_FILE（可直接用 docker compose up -d）"
+fi
+
 echo
-echo "==> 启动 4 个容器（mongodb / redis / scope-sentry / scopesentry-scan）"
-echo "    镜像较大，首次拉取需要几分钟。"
-docker compose -f "$COMPOSE_FILE" up -d || {
+echo "==> 拉取镜像（逐个拉，失败/超时不阻塞其余服务）"
+# compose 并发拉多个大镜像容易长时间卡住且无输出（进度条在非 TTY 下不刷新）。
+# 改为逐个 pull：进度可见、失败可单独重试，并且**超时的镜像不阻塞核心服务启动**。
+PULL_FAILED=""
+for IMG in $(docker compose -f "$COMPOSE_FILE" config --images 2>/dev/null | sort -u); do
+  if docker image inspect "$IMG" >/dev/null 2>&1; then
+    echo "    [已有] $IMG"
+    continue
+  fi
+  echo "    拉取 $IMG ..."
+  if ! timeout "${SCOPESENTRY_PULL_TIMEOUT:-600}" docker pull "$IMG"; then
+    echo "[!] $IMG 拉取失败或超时（>${SCOPESENTRY_PULL_TIMEOUT:-600}s），可单独重试: docker pull $IMG"
+    PULL_FAILED="$PULL_FAILED $IMG"
+  fi
+done
+
+echo
+echo "==> 启动核心服务（mongodb / redis / scope-sentry）"
+# 扫描节点 scopesentry-scan 是**可选**的（官方支持另建独立节点仓库），
+# 其镜像较大、拉取可能很慢；核心三件套先起来，保证 Web UI 可用。
+docker compose -f "$COMPOSE_FILE" up -d mongodb redis scope-sentry || {
   echo
   echo "[X] 启动失败。排查："
   echo "    1) docker compose -f $COMPOSE_FILE ps"
@@ -138,6 +164,15 @@ docker compose -f "$COMPOSE_FILE" up -d || {
   echo "    3) 若是拉镜像超时 → 配镜像加速源（见 SKILL.md 第 2.5 步）"
   exit 1
 }
+
+# 扫描节点：镜像已在本地则一起起起来；没有就跳过（可选）
+if docker image inspect "autumn27/scopesentry-scan:latest" >/dev/null 2>&1; then
+  echo "==> 启动扫描节点（可选）"
+  docker compose -f "$COMPOSE_FILE" up -d scopesentry-scan 2>&1 | tail -2
+else
+  echo "[!] 扫描节点镜像尚未就绪，跳过（可选服务，不影响 Web UI）"
+  echo "    之后可执行: cd $INSTALL_DIR && docker compose pull && docker compose up -d scopesentry-scan"
+fi
 
 echo
 echo "==> 等待服务就绪（最多 240 秒）..."
@@ -153,6 +188,11 @@ done
 echo
 echo "==> 容器状态："
 docker compose -f "$COMPOSE_FILE" ps 2>/dev/null | sed 's/^/  /'
+if [ -n "$PULL_FAILED" ]; then
+  echo
+  echo "[!] 以下镜像未拉取成功（相关服务可能未启动）:$PULL_FAILED"
+fi
+
 echo
 echo "==> 初始用户密码（仅本次输出，请立刻保存）："
 docker logs scope-sentry 2>&1 | grep -aiE 'password|密码|passwd' | tail -6
@@ -162,12 +202,6 @@ echo "    1) Web UI: http://<服务器IP>:8082/"
 echo "    2) 插件二次验证密码: docker logs scope-sentry | grep -i 验证"
 echo "    3) 自检:   bash scripts/verify.sh --app scopesentry"
 
-# 建默认名软链，让 `cd /opt/scopesentry && docker compose up -d` 直接可用
-# （官方 compose 文件名是 single-host-deployment.yml，不是默认名）
-if [ "$COMPOSE_FILE" != "docker-compose.yml" ]; then
-  ln -sf "$COMPOSE_FILE" docker-compose.yml
-  echo "[+] 已创建软链 docker-compose.yml -> $COMPOSE_FILE（可直接用 docker compose up -d）"
-fi
 
 
 # 重启策略规范化：官方 compose 用 restart: always（手动 stop 后开机仍会被拉起），

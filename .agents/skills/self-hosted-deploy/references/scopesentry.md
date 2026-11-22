@@ -149,6 +149,20 @@ docker compose logs -f     # 日志
 
 也可以用统一入口：`./ctl.sh start|stop|status|logs`（等价，省记 compose 文件名）。
 
+## 大镜像拉取与可选扫描节点
+
+`autumn27/scopesentry-scan:latest` 是**可选**的扫描节点，镜像层多、体积大，
+在网络较慢的机器上可能拉很久（实测有一台拉了 30 分钟仍未完成，进度条在非 TTY 下不刷新）。
+
+安装脚本的处理：
+
+1. **逐个** `docker pull`（不并发），进度可见、失败可单独重试，单镜像超时默认 600 秒；
+2. 超时的镜像**不阻塞**核心服务 —— 先起 `mongodb` / `redis` / `scope-sentry` 三件套，Web UI 立刻可用；
+3. 扫描节点镜像就绪后再补：`cd /opt/scopesentry && docker compose up -d scopesentry-scan`。
+
+> 扫描节点是**可选**的：官方支持另建独立节点仓库（ScopeSentry-Scan），
+> 核心功能（资产、任务、结果管理）不依赖它。
+
 ## 日常使用
 
 - Web UI：<http://<服务器IP>:8082/>
@@ -178,6 +192,9 @@ docker-compose -f scan-docker-compose.yml up -d
 | `scopesentry-mongodb` 反复 Restarting (132) | CPU 无 AVX，MongoDB 5+ 崩溃 | 见上文「低配 CPU 适配」 |
 | `scope-sentry` 起不来，提示依赖 unhealthy | mongo/redis 没 healthy | 先看 `docker compose logs mongodb redis`；mongo 常见原因是无 AVX |
 | 扫描任务无结果 | 扫描节点异常 | `docker logs scopesentry-scan`；节点是 host 网络，注意与宿主端口冲突 |
+| `docker compose up -d` 报 "no configuration file provided" | 官方 compose 文件名是 `single-host-deployment.yml`（非默认名） | 安装脚本会建 `docker-compose.yml` 软链；没有就手动 `ln -sf single-host-deployment.yml docker-compose.yml` |
+| 拉镜像长时间无输出 | 大镜像 + 非 TTY 进度条不刷新 | 单独 `docker pull <镜像>` 观察；慢就等，或先起核心三件套 |
+| verify 报 `scopesentry-scan 未运行` | 扫描节点是**可选**的 | 已改为警告；需要时再 `docker compose up -d scopesentry-scan` |
 | 登录提示密码错误 | 用了旧的初始密码 | `docker logs scope-sentry | grep -i password` 取最新；数据库首次初始化后不会重复打印 |
 | 数据库连不上 | `.env` 密码改了但容器没重建 | `docker compose -f single-host-deployment.yml up -d --force-recreate` |
 | 磁盘增长快 | `./data/` 存了扫描结果与文件 | 定期清理 `./data/files` `./data/images` `./data/uploads` |
