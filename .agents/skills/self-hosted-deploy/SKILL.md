@@ -4,7 +4,7 @@ description: 在 Linux 主机上部署自托管服务与安全工具（长亭雷
 compatibility: Linux (x86_64/arm64)，多数部署需要 root 权限、Docker + Compose v2、可访问 GitHub 与镜像仓库
 metadata:
   version: 2.0.0
-  supported_apps: [safeline, artex, cyberstrike]
+  supported_apps: [safeline, artex, cyberstrike, scopesentry]
 ---
 
 # Linux 自托管服务 / 安全工具部署
@@ -16,6 +16,7 @@ metadata:
 | **长亭雷池 SafeLine CE** | 装雷池 / 部署 WAF / SafeLine / 下一代 WAF / 反代防护 | `references/safeline.md` |
 | **ARTEX**（AI 自主渗透测试系统） | 装 ARTEX / AI 渗透测试平台 / 自动化渗透 / 红队平台 | `references/artex.md` |
 | **CyberStrikeAI**（AI 原生渗透测试平台） | 装 CyberStrike / CyberStrikeAI / AI 安全编排 / 渗透测试平台 | `references/cyberstrike.md` |
+| **ScopeSentry**（子域名/端口/敏感信息/漏洞 扫描平台） | 装 ScopeSentry / 子域名枚举 / cyberspace 测绘 / 资产测绘 / 漏洞扫描平台 | `references/scopesentry.md` |
 
 **装新软件时**：先读该软件的官方 README，把安装命令写进 `scripts/install_<app>.sh`、把专有坑位写进 `references/<app>.md`，然后在上表加一行、在 `scripts/precheck.sh` / `scripts/init_admin.sh` / `scripts/verify.sh` 里加上它的 `--app` 分支。不要凭印象写安装命令。
 
@@ -58,7 +59,7 @@ metadata:
 bash scripts/precheck.sh --app <app> [--docker]
 ```
 
-`--app` 取 `safeline` / `artex` / `cyberstrike`。退出码：`0` 通过 / `20` 硬件或依赖不满足 / `21` 端口冲突 / `10` Docker 未就绪。
+`--app` 取 `safeline` / `artex` / `cyberstrike` / `scopesentry`。退出码：`0` 通过 / `20` 硬件或依赖不满足 / `21` 端口冲突 / `10` Docker 未就绪。
 
 通用项：系统架构、内存、磁盘、git、curl、Docker + Compose v2。
 `--docker` 才会真正连 Docker daemon 探活。各 app 还有专属检查项（雷池的 ssse3/9443、ARTEX 的 8787/Go、CyberStrikeAI 的 8080/Go≥1.25/Node≥22.19/gcc/Python≥3.10）。
@@ -125,6 +126,7 @@ bash scripts/verify.sh --app <app>
 - `references/safeline.md` —— 雷池 SafeLine CE 安装细节
 - `references/artex.md` —— ARTEX 安装细节
 - `references/cyberstrike.md` —— CyberStrikeAI 安装细节
+- `references/scopesentry.md` —— ScopeSentry 安装细节
 - `references/故障排查.md` —— 通用排障手册
 - `references/运维速查.md` —— 日常运维命令
 - `references/离线安装.md` —— 无外网 / 内网场景

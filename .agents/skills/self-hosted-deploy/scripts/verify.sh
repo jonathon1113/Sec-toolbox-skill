@@ -26,6 +26,7 @@ case "$APP" in
   safeline) echo " 雷池 SafeLine CE 自检" ;;
   artex)    echo " ARTEX 自检" ;;
   cyberstrike) echo " CyberStrikeAI 自检" ;;
+  scopesentry) echo " ScopeSentry 自检" ;;
   *) echo "[X] 未知 --app: $APP"; exit 1 ;;
 esac
 echo "=========================================="
@@ -43,6 +44,16 @@ if have docker && docker info >/dev/null 2>&1; then
       else
         echo "  运行中: $RUNNING / 共 $TOTAL"
       fi
+      ;;
+    scopesentry)
+      docker ps -a --filter "name=scopesentry" --filter "name=scope-sentry" --format '{{.Names}}	{{.Status}}' 2>/dev/null | sed 's/^/  /'
+      for c in scopesentry-mongodb scopesentry-redis scope-sentry scopesentry-scan; do
+        if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$c"; then
+          echo "  $c: 运行中"
+        else
+          echo "  <== $c 未运行"; FAIL=1
+        fi
+      done
       ;;
     cyberstrike)
       if pgrep -f 'cyberstrike-ai' >/dev/null 2>&1; then
@@ -80,6 +91,7 @@ case "$APP" in
   safeline) PORT=9443 ;;
   artex)    PORT=8787 ;;
   cyberstrike) PORT=8080 ;;
+  scopesentry) PORT=8082 ;;
 esac
 if have ss; then
   if ss -lnt 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${PORT}\$"; then
@@ -97,6 +109,7 @@ case "$APP" in
   safeline) URL="https://127.0.0.1:${PORT}/" ;;
   artex)    URL="http://127.0.0.1:${PORT}/" ;;
   cyberstrike) URL="https://127.0.0.1:${PORT}/" ;;
+  scopesentry) URL="http://127.0.0.1:${PORT}/" ;;
 esac
 if have curl; then
   CODE="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 15 "$URL" 2>/dev/null)"
@@ -118,6 +131,22 @@ case "$APP" in
       ls /data/safeline 2>/dev/null | sed 's/^/    /' | head -6
     else
       echo "  <== /data/safeline 不存在"; FAIL=1
+    fi
+    ;;
+  scopesentry)
+    SDIR="${SCOPESENTRY_DIR:-/opt/scopesentry}"
+    if [ -d "$SDIR" ]; then
+      echo "  安装目录: $SDIR"
+      [ -f "$SDIR/single-host-deployment.yml" ] && echo "    compose 文件存在" || echo "    <== 缺少 single-host-deployment.yml"
+      [ -f "$SDIR/.env" ] && echo "    .env 存在" || echo "    <== .env 缺失（数据库/Redis 密码在此）"
+      if grep -qE '^(MONGO_INITDB_ROOT_PASSWORD|REDIS_PASSWORD)=(mongodb_password|redis_password|password|change-me-please|)$' "$SDIR/.env" 2>/dev/null; then
+        echo "    <== .env 里仍是默认弱密码，必须改掉"; FAIL=1
+      else
+        echo "    .env 密码已设为非默认值"
+      fi
+      [ -d "$SDIR/data" ] && echo "    data/ 存在（持久化）"
+    else
+      echo "  未找到 $SDIR 安装目录"
     fi
     ;;
   cyberstrike)
@@ -176,6 +205,7 @@ if [ "$FAIL" = "0" ]; then
     safeline) echo "控制台地址: https://<服务器IP>:${PORT}/" ;;
     artex)    echo "Web UI: http://<服务器IP>:${PORT}/  （首次访问 /setup 用 setup token 认领）" ;;
     cyberstrike) echo "Web UI: https://<服务器IP>:${PORT}/  （自签证书，首次需接受告警；http:// 会 308 跳 https）" ;;
+    scopesentry) echo "Web UI: http://<服务器IP>:${PORT}/" ;;
   esac
   exit 0
 else

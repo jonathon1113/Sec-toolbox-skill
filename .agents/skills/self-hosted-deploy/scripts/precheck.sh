@@ -30,6 +30,13 @@ case "$APP" in
     MIN_MEM=2048
     MIN_DISK=5
     ;;
+  scopesentry)
+    TITLE="ScopeSentry ( cyberspace 测绘 / 扫描平台)"
+    PORTS="8082"
+    PORT_DESC="ScopeSentry Web UI 默认端口"
+    MIN_MEM=2048
+    MIN_DISK=5
+    ;;
   cyberstrike)
     TITLE="CyberStrikeAI (AI 原生渗透测试平台)"
     PORTS="8080"
@@ -132,6 +139,18 @@ case "$APP" in
       echo "检测到已有雷池容器："
       docker ps -a --filter "name=safeline" --format '  {{.Names}}\t{{.Status}}' 2>/dev/null
       echo "  <== 已安装过，如需重装请先与用户确认"
+    fi
+    ;;
+  scopesentry)
+    if have docker; then
+      echo "Docker      : $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo '已安装(daemon未探活)')"
+      docker compose version >/dev/null 2>&1 && echo "Compose     : $(docker compose version --short 2>/dev/null) 可用"         || echo "Compose     : 缺失  <== ScopeSentry 部署需要 Compose v2"; FAIL=1
+    else
+      echo "Docker      : 缺失  <== ScopeSentry 是 Docker Compose 部署，请先执行 linux-docker-env/scripts/install_docker.sh"; FAIL=1
+    fi
+    if have curl; then echo "curl        : 已安装（下载 compose/.env 用）"; else echo "curl        : 缺失  <== 下载 compose 文件需要"; FAIL=1; fi
+    if [ -f /opt/scopesentry/single-host-deployment.yml ]; then
+      echo "检测到已有 /opt/scopesentry 部署目录  <== 可能已安装过，重装前先与用户确认"
     fi
     ;;
   cyberstrike)

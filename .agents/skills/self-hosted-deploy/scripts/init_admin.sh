@@ -14,7 +14,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$APP" ]; then
-  echo "用法: bash init_admin.sh --app <safeline|artex|cyberstrike>"
+  echo "用法: bash init_admin.sh --app <safeline|artex|cyberstrike|scopesentry>"
   exit 1
 fi
 
@@ -70,6 +70,17 @@ case "$APP" in
     fi
     ;;
 
+  scopesentry)
+    C="$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -x 'scope-sentry' | head -1)"
+    if [ -z "$C" ]; then
+      echo "[X] 未找到 scope-sentry 容器，ScopeSentry 似乎未安装。"; exit 1
+    fi
+    echo "==> 取初始用户密码（仅本次输出，请立刻保存）："
+    echo "    注意：数据库首次初始化时才打印，重启容器不会重复打印。"
+    echo
+    docker logs "$C" 2>&1 | grep -aiE 'password|密码|passwd' | tail -6
+    ;;
+
   cyberstrike)
     DIR="${CYBERSTRIKE_DIR:-/opt/cyberstrike}"
     LOGF=""
@@ -89,5 +100,5 @@ case "$APP" in
     ;;
 
   *)
-    echo "[X] 未知 --app: $APP（可选 safeline | artex | cyberstrike）"; exit 1 ;;
+    echo "[X] 未知 --app: $APP（可选 safeline | artex | cyberstrike | scopesentry）"; exit 1 ;;
 esac
