@@ -135,6 +135,18 @@ RestartSec=5
 
 二进制名：`run.sh` 构建产物是 `cyberstrike-ai`（仓库根目录）。
 
+## 老系统（CentOS 7 等 glibc 2.17）专项
+
+CentOS 7 默认 glibc 2.17 / Python 3.6 / 无 gcc，三处都要单独处理：
+
+| 组件 | 问题 | 解决 |
+|---|---|---|
+| Python | 3.6.8 < 3.10 | 用 **python-build-standalone** 预编译版（glibc 2.17 兼容，自带 ssl/venv）：从 `https://github.com/astral-sh/python-build-standalone/releases` 下载 `cpython-3.11.x-x86_64-unknown-linux-gnu-install_only.tar.gz` 解压到 `/opt/python3.11`，**不要替换系统 python3**，安装时 `export PATH=/opt/python3.11/bin:$PATH` |
+| Node.js | 官方包要 glibc ≥ 2.28，报 `GLIBC_2.28 not found` | 用 **unofficial-builds** 的 **glibc-217** 包：`https://unofficial-builds.nodejs.org/download/release/v22.21.1/node-v22.21.1-linux-x64-glibc-217.tar.xz` |
+| C 编译器 | 没有 gcc → Go 自动 `CGO_ENABLED=0` → SQLite stub | `yum install -y gcc`（gcc 4.8 足够），然后**强制重编**：`rm -f cyberstrike-ai && CGO_ENABLED=1 go build -o cyberstrike-ai ./cmd/server` |
+
+> ⚠️ `run.sh` 会**复用已存在的二进制**，改完编译参数不会自动重建 —— 必须先删掉旧二进制。
+
 ## 选装安全工具（可选）
 
 平台自带工具编排，但底层扫描器要在系统里装好，缺了就跳过或运行时替代：
@@ -156,6 +168,8 @@ sudo apt install -y nmap masscan sqlmap nikto gobuster hydra hashcat john binwal
 | 用 IP 访问证书不匹配 | 自签 SAN 只有 localhost/127.0.0.1 | 配 `tls_cert_path`/`tls_key_path`，或用 `--http` |
 | 启动即 `应用初始化失败` / `go-sqlite3 requires cgo to work. This is a stub` | 编译时没有 C 编译器，Go 自动 `CGO_ENABLED=0` | 装 gcc 后**强制重新编译**（run.sh 会复用旧二进制，必须先删）：`rm -f cyberstrike-ai && CGO_ENABLED=1 go build -o cyberstrike-ai ./cmd/server` |
 | CentOS 7：Python 3.6 不满足 / Node 二进制报 GLIBC_2.28 not found | 系统太老 | Python 用 python-build-standalone 预编译版（glibc 2.17 兼容）；Node 用 unofficial-builds 的 **glibc-217** 包 |
+| 启动后 `sqlite3.DatabaseError: malformed database schema` | 首次启动 SQLite 初始化失败留下的**半成品 DB** | 停服务 → `mv data/conversations.db{,.bak}` → 重启（会重新初始化并打印一次性 admin 密码） |
+| `--reset-admin-password` 报 `inappropriate ioctl for device` | 该命令是**交互式**的，要 TTY 输入新密码 | 用伪终端：`python3 scripts/pty_runner.py "./cyberstrike-ai -config config.yaml --reset-admin-password"`；或删掉半成品 DB 重新初始化 |
 | `python3 -m venv` 失败 | 缺 python3-venv | `apt install -y python3-venv` |
 | `Failing command: <目录>/venv/bin/python3` | 上次 run.sh 中断留下的**半成品 venv** | `rm -rf <安装目录>/venv` 后重跑 run.sh |
 | go build 拉依赖超时 | GOPROXY 不通 | run.sh 默认已用 goproxy.cn；不通则 `export GOPROXY=https://goproxy.cn,direct` |
