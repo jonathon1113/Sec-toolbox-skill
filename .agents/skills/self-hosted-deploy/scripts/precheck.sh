@@ -148,7 +148,13 @@ case "$APP" in
       echo "Go          : 缺失  <== 需要 >= 1.25（https://go.dev/dl/）"; FAIL=1
     fi
     if have python3; then
+      PYV="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null)"
       echo "Python      : $(python3 -V 2>&1)"
+      if [ -n "$PYV" ] && [ "$(printf '%s
+3.10
+' "$PYV" | sort -V | head -1)" != "3.10" ]; then
+        echo "Python 版本 : $PYV <== 需要 >= 3.10（CentOS 7 默认 3.6 不满足，需装新版）"; FAIL=1
+      fi
       # 必须**真实创建**一次 venv：Debian 上 `import venv` 能过，但没有 python3-venv 包时
       # 创建会因缺 ensurepip/pip 失败（run.sh 报 "Failing command: venv/bin/python3"）
       if python3 -m venv /tmp/_venv_probe >/dev/null 2>&1; then
@@ -173,6 +179,17 @@ case "$APP" in
     else
       echo "Node       : 缺失  <== run.sh 需要 Node >= 22.19（Pi agent runtime）"
       echo "             安装: https://nodejs.org/dist/ 或 NodeSource setup_22.x"; FAIL=1
+    fi
+    # 项目用 SQLite（go-sqlite3），必须 CGO；没有 C 编译器时 Go 会自动把 CGO_ENABLED 置 0，
+    # 编译出的二进制启动即 fatal: "go-sqlite3 requires cgo to work. This is a stub"
+    if have gcc || have cc; then
+      echo "C 编译器   : $( (gcc --version 2>/dev/null || cc --version 2>/dev/null) | head -1)"
+      echo "             （项目依赖 SQLite，需要 CGO_ENABLED=1）"
+    else
+      echo "C 编译器   : 缺失  <== 项目用 SQLite(go-sqlite3)，需要 cgo！"
+      echo "             缺 C 编译器时 Go 会自动禁用 CGO，编译出的二进制启动即 fatal。"
+      echo "             安装: yum install -y gcc  /  apt install -y build-essential"
+      FAIL=1
     fi
     if [ -d /opt/cyberstrike ]; then
       echo "检测到已有 /opt/cyberstrike 目录  <== 可能已安装过，重装前先与用户确认"

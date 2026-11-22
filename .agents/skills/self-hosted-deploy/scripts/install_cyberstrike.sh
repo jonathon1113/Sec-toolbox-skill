@@ -97,6 +97,14 @@ else
   exit 1
 fi
 
+if ! need_cmd gcc && ! need_cmd cc; then
+  echo "[X] 未检测到 C 编译器。项目使用 SQLite(go-sqlite3)，需要 CGO_ENABLED=1；"
+  echo "    缺 C 编译器时 Go 会自动禁用 CGO，编译出的二进制启动即 fatal。"
+  echo "    安装: yum install -y gcc   或   apt install -y build-essential"
+  exit 1
+fi
+echo "C 编译器   : $( (gcc --version 2>/dev/null || cc --version 2>/dev/null) | head -1)"
+
 if ! need_cmd git; then
   echo "[X] 未检测到 git。请先安装（yum install -y git / apt install -y git）。"
   exit 1
