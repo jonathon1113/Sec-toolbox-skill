@@ -100,4 +100,6 @@ docker compose logs -f arl_web
 | 任务一直排队不执行 | rabbitmq/worker 异常 | `docker compose logs arl_worker arl_rabbitmq` |
 | 资产归属地为空 | 缺 GeoIP mmdb | 见上文「配置要点」 |
 | worker 反复重启 / OOM | 内存不足（官方建议 8G） | 加内存；或减少 `docker-compose.yml` 里 celery 的并发数 `-c 2` |
-| 拉镜像很慢 | Docker Hub 链路问题 | 按 SKILL.md 第 2.5 步真实 pull 测速后配镜像加速源 |
+| 拉镜像很慢 / 拉不完 | Docker Hub 链路问题，ARL 镜像有 1.69GB | 按 SKILL.md 第 2.5 步真实 pull 测速后配镜像加速源 |
+| `ki9mu/arl-ki9mu` 拉了 15 分钟还没完 | 加速源只有 2 个且都不通该镜像的大层 | **补多个加速源让 Docker 自动 fallback**（实测有效）：`daocloud` + `1panel` + `dockerproxy.net` + `docker.1ms.run` + `hub.rat.dev`，改完 `systemctl restart docker` 再 pull |
+| 某个镜像拉失败导致整体装不上 | —— | 脚本会跳过失败镜像继续拉其余的；**镜像补齐后直接重跑安装脚本**即可（幂等：复用已有文件、外部卷、镜像） |
