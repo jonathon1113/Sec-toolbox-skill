@@ -17,6 +17,10 @@ ARG="${4:-}"
 
 if [ "$MODE" = "compose" ]; then
   COMPOSE="${ARG:-docker-compose.yml}"
+  case "$COMPOSE" in
+    /*) : ;;                       # 绝对路径：compose 文件在别处（如雷池的 /data/safeline）
+    *) COMPOSE="$COMPOSE" ;;
+  esac
   cat > "$DIR/ctl.sh" <<EOF
 #!/usr/bin/env bash
 # ctl.sh - ${APP} 统一管理入口

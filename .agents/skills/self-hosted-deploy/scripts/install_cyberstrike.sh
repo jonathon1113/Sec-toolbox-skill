@@ -207,6 +207,10 @@ fi
 
 echo
 
+# 重启策略: 本软件是 systemd 托管，**天然满足**「手动 stop 后开机不自启」——
+# systemd 会记住 systemctl stop 的状态，机器重启后不会自动拉起；崩溃退出则由 Restart=always 恢复。
+# 因此这里不需要 set_restart_policy.sh（那是给 Docker 容器用的）。
+
 # 生成统一启停入口: <安装目录>/ctl.sh
 bash "$(dirname "${BASH_SOURCE[0]}")/make_ctl.sh" systemd CyberStrikeAI "$INSTALL_DIR" cyberstrike 2>/dev/null || true
 echo "==> 下一步："

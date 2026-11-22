@@ -51,11 +51,44 @@ metadata:
 > 上游没有容器方案时（如 CyberStrikeAI 只提供 `run.sh` 源码构建），就用上游唯一官方路径，
 > 并在参考文档里说明"这是官方方案，不是跳过 Docker 的降级"。
 
-**新增一个软件只需要动三处**：
+**新增一个软件只需要动四处**：
 
 1. `references/<app>.md`：专有细节、官方安装方式、配置项、专属排障；
-2. `scripts/install_<app>.sh`：把官方安装命令写进脚本并注明出处；
-3. `SKILL.md` 的"支持的软件"表加一行 + `precheck.sh` / `init_admin.sh` / `verify.sh` 里加该 app 的分支。
+2. `scripts/install_<app>.sh`：把官方安装命令写进脚本并注明出处，**并在末尾调用下面两个公共脚本**；
+3. `scripts/precheck.sh` / `init_admin.sh` / `verify.sh` 里加该 app 的 `--app` 分支；
+4. `SKILL.md` 的"支持的软件"表加一行 + `metadata.supported_apps` 补上。
+
+## 每个新软件都必须具备的两件事
+
+### 1. 统一启停入口 `ctl.sh`
+
+安装目录（默认 `/opt/<app>/`）里生成 `ctl.sh`，提供
+`start / stop / down / restart / status / logs / update`：
+
+```bash
+# install_<app>.sh 末尾调用
+bash "$(dirname "${BASH_SOURCE[0]}")/make_ctl.sh" compose "<软件名>" "$INSTALL_DIR" "<compose 文件名>"
+bash "$(dirname "${BASH_SOURCE[0]}")/make_ctl.sh" systemd "<软件名>" "$INSTALL_DIR" "<systemd 服务名>"
+```
+
+- compose 型的 `ctl.sh` 里 `stop` 用 `docker compose stop`（**保留容器与数据**），`down` 才删容器；
+- compose 文件名不是默认名时，另外建 `docker-compose.yml` 软链，让
+  `cd <安装目录> && docker compose up -d` 直接可用；
+- systemd 型（源码构建、无容器方案的软件）的 `ctl.sh` 转 `systemctl` / `journalctl`。
+
+### 2. 重启策略规范化为 `unless-stopped`
+
+Docker 官方 compose 常用 `restart: always`，会导致**手动 stop 的容器在机器重启后仍被拉起**。
+统一改成 `unless-stopped`：手动 stop 的保持停止，崩溃/daemon 重启仍自动恢复。
+
+```bash
+# install_<app>.sh 末尾调用（同时改 compose 文件里的 restart 字段与容器策略）
+bash "$(dirname "${BASH_SOURCE[0]}")/set_restart_policy.sh" --compose "<compose 文件路径>"
+```
+
+systemd 托管的软件天然满足该语义（systemd 记得 `systemctl stop` 的状态），无需处理。
+
+> 这两条是**硬性要求**：不满足就不能算"安装完成"，交付前要逐条核对。
 
 ## 命名
 
@@ -152,5 +185,8 @@ bash scripts/verify.sh --app <app>
 - [ ] `precheck.sh` 不改动任何系统状态
 - [ ] `verify.sh` 能独立判断成功/失败
 - [ ] 多软件：每个 app 都有 `references/<app>.md` + `install_<app>.sh` + 三处 `--app` 分支
+- [ ] **每个 app 的安装目录里有 `ctl.sh`**（统一启停入口），且 install 脚本会生成它
+- [ ] **Docker 部署的 app：restart 策略已是 `unless-stopped`**（手动 stop 后开机不自启）
+- [ ] 安装目录在 `/opt/<app>/`（上游官方固定路径的除外，需提供 `/opt/<app>/ctl.sh` 转发入口）
 - [ ] 故障排查文档覆盖：拉镜像失败、端口冲突、忘记密码、访问不通
 - [ ] 没有硬编码密码/token
