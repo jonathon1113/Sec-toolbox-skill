@@ -17,7 +17,7 @@ metadata:
 | **ARTEX**（AI 自主渗透测试系统） | 装 ARTEX / AI 渗透测试平台 / 自动化渗透 / 红队平台 | `references/artex.md` |
 | **CyberStrikeAI**（AI 原生渗透测试平台） | 装 CyberStrike / CyberStrikeAI / AI 安全编排 / 渗透测试平台 | `references/cyberstrike.md` |
 
-**装新软件时**：先读该软件的官方 README，把安装命令写进 `scripts/install_<app>.sh`、把专有坑位写进 `references/<app>.md`，然后在上表加一行、在 `scripts/precheck.sh` 与 `scripts/verify.sh` 里加上它的专属检查项。不要凭印象写安装命令。
+**装新软件时**：先读该软件的官方 README，把安装命令写进 `scripts/install_<app>.sh`、把专有坑位写进 `references/<app>.md`，然后在上表加一行、在 `scripts/precheck.sh` / `scripts/init_admin.sh` / `scripts/verify.sh` 里加上它的 `--app` 分支。不要凭印象写安装命令。
 
 ## 请求路由表（先查这里，决定做到哪一步就停）
 
@@ -58,10 +58,10 @@ metadata:
 bash scripts/precheck.sh --app <app> [--docker]
 ```
 
-`--app` 取 `safeline` / `artex`。退出码：`0` 通过 / `20` 硬件或依赖不满足 / `21` 端口冲突 / `10` Docker 未就绪。
+`--app` 取 `safeline` / `artex` / `cyberstrike`。退出码：`0` 通过 / `20` 硬件或依赖不满足 / `21` 端口冲突 / `10` Docker 未就绪。
 
 通用项：系统架构、内存、磁盘、git、curl、Docker + Compose v2。
-`--docker` 才会真正连 Docker daemon 探活。
+`--docker` 才会真正连 Docker daemon 探活。各 app 还有专属检查项（雷池的 ssse3/9443、ARTEX 的 8787/Go、CyberStrikeAI 的 8080/Go≥1.25/Node≥22.19/gcc/Python≥3.10）。
 
 **内存不足不阻断但必须报告**：装完运行时内存不够会 OOM；有 swap 就继续并提示用户加内存。
 
